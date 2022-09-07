@@ -1,7 +1,7 @@
-import 'package:togglers/togglers.dart';
+import 'package:toggler/toggler.dart';
 
 void main() {
-  void ourNotify(_, Togglers cu) {
+  void ourNotify(_, Toggler cu) {
     var tg = '    set: ';
     var ds = ' active: ';
     for (int i = 0; i < 27; i++) {
@@ -14,7 +14,7 @@ void main() {
     print('          -----------------------------------------------------');
   }
 
-  /*void ourChgNotifier(Togglers oS, Togglers nS) {
+  /*void ourChgNotifier(Toggler oS, Toggler nS) {
     // final chVN = ValueNotifier<int>(0);
     if (toggledInRange(oS, nS, first: kTGnameC, last: kTGnameH)) {
       // chVN = nS.hh // hh is guaranteed to be unique on each change
@@ -22,7 +22,7 @@ void main() {
   }*/
 
   // pt is a copy of previous state, cu is the current (live) state
-  bool ourCheck(Togglers oS, Togglers nS) {
+  bool ourCheck(Toggler oS, Toggler nS) {
     // validate: 'NameA' can toggle only if 'Name0' was set.
     if (!oS[kTGname0] && oS[kTGnameA] != nS[kTGnameA]) {
       print('      >>> NameA change supressed by validator');
@@ -43,7 +43,7 @@ void main() {
     return true; // accept changes
   }
 
-  final flags = Togglers(notify: ourNotify, checkFix: ourCheck);
+  final flags = Toggler(notify: ourNotify, checkFix: ourCheck);
 
   // declare a radioGroup, up to 21 groups can be made over 63 items.
   flags.radioGroup(kTGnameD, kTGnameF);

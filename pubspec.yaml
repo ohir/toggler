@@ -1,4 +1,4 @@
-name: togglers
+name: toggler
 description: Model class for wiring up to 63 Flags, Switches, Checkboxes, Indicators, Buttons, and Radio-Button items. For use with Get_it_mixin or any other state management library.
 version: 1.0.0
 homepage: https://github.com/ohir/togglers
@@ -9,4 +9,3 @@ environment:
 dev_dependencies:
   lints: ^2.0.0
   test: ^1.16.0
-
