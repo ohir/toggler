@@ -1,13 +1,25 @@
 /// Togglers keeps state of up to 63 items (flags) with built-in support for
 /// _radio-button_ type groups and independent _enable_/_disable_ semantics
 /// for UI use.  Togglers library supports on-change state validation and fixes,
-/// and it can be wired to almost any state management library - via its `notify`
-/// callback.  Togglers library is 160 lines of pure Dart with zero dependencies.
+/// and it can be wired to almost any state management library via its `notify`
+/// interface.
+///
+/// Togglers library is 160 lines of pure Dart with zero dependencies.
 ///
 /// Each Togglers item on/off state can be retrieved using index[] operator,
 /// usually with a constant symbolic index number in 0..62 range.
 library togglers;
 
+/// class Togglers {
+/// ```
+///   tg: int items_state,
+///   ds: int disable_state,
+///   rm: int radio_groups_config,
+///   hh: int history_hash,
+///   check:  bool verify_and_fix(old_state,current_object)
+///   notify: void on_change(current_object)
+/// ```
+/// }
 class Togglers {
   /// items state (0:off/cleared, 1:on/set)
   int tg;
@@ -64,14 +76,20 @@ class Togglers {
   /// changes further applied to the live Togglers via `updateFromCopy` call.
   TogglersChangeNotify? notify;
 
-  /// The only Togglers constructor
-  Togglers(
-      {this.tg = 0,
-      this.ds = 0,
-      this.rm = 0,
-      this.hh = 0,
-      this.check,
-      this.notify});
+  /// ```
+  ///   check:  verify or fix state  check(previous, current)
+  ///   notify: call after change     notify(current)
+  ///   tg, ds, rm, keep the state;   hh changes for each notify
+  /// ```
+  /// )
+  Togglers({
+    this.check,
+    this.notify,
+    this.tg = 0,
+    this.ds = 0,
+    this.rm = 0,
+    this.hh = 0,
+  });
 
   void _err(String estr, int i) {
     tg |= 1 << 63; // clear with: x.tg = x.tg.toUnsigned(63);
@@ -111,14 +129,14 @@ class Togglers {
   /// The `hh` member keeps history (indice) of most recent five outer changes.
   int get lastChangeIndex => hh.toUnsigned(6);
 
-  /// sync `tg` and `ds` state from a live Togglers object.
+  /// sync `tg` and `ds` state from other live Togglers object.
   void syncFrom(Togglers from) {
     tg = from.tg;
     ds = from.ds;
   }
 
   /// Update state from a copied Togglers object (usually check's prev argument)
-  /// Returns `false` if there was a race, or if `from` was not a copy of `this`.
+  /// Returns `false` if there was a race (or if `from` was not a copy of `this`).
   bool updateFromCopy(Togglers from) {
     tg = from.tg;
     ds = from.ds;
@@ -143,13 +161,14 @@ class Togglers {
   bool operator [](int i) => tg & (1 << _v(i)) != 0;
 
   /// hasActive returns true if Togglers item at index `i` is enabled
+  /// `if (flags.hasActive(ktgPremium)) {...}`
   bool hasActive(int i) => ds & (1 << _v(i)) == 0;
 
   /// method `on` sets item at index i
   void set(int i) {
     i = _v(i);
     int prev = tg;
-    if (rm & 1 << i == 0) {
+    if (rm & (1 << i) != 0) {
       int k = i;
       int n = 1 << i;
       // clear all in this radio group
@@ -191,8 +210,10 @@ class Togglers {
     }
   }
 
-  /// method `setTo` sets item at index i to the explicit state
-  void setTo(int i, bool state) {
+  /// method `setTo` sets item at index i to the explicit state on:true or off:false.
+  /// Optional argument `ifActive: true` allow changes only for an Active item.
+  void setTo(int i, bool state, {bool ifActive = false}) {
+    if (ifActive && !hasActive(i)) return;
     if (state) {
       set(i);
     } else {
@@ -203,7 +224,8 @@ class Togglers {
   /// toggle changes item at index i to the opposite state.
   /// Note that toggle does not know about radio groups by itself
   /// so toggle on an active radio will make all in group being off!
-  void toggle(int i) {
+  void toggle(int i, {bool ifActive = false}) {
+    if (ifActive && !hasActive(i)) return;
     if (tg & (1 << _v(i)) != 0) {
       int prev = tg;
       tg &= ~(1 << i);
@@ -219,13 +241,13 @@ class Togglers {
   }
 
   /// enables item at index i
-  void enable(int i) => setds(i, true);
+  void enable(int i) => setDS(i, true);
 
   /// disables item at index i
-  void disable(int i) => setds(i, false);
+  void disable(int i) => setDS(i, false);
 
   /// set enable (true) or disable(false) state
-  void setds(int i, bool state) {
+  void setDS(int i, bool state) {
     int prev = ds;
     if (state) {
       ds &= ~(1 << _v(i)); // 0:enabled
@@ -248,10 +270,12 @@ class Togglers {
   /// 1..3, 5..7 (gap at 4) are OK but 1..3 and 4..6 are NOT (no 3 to 4 gap).
   /// Gap index is fully usable for an alone Togglers item.
   /// Allowed group boundaries assertion is: `0 < first < last < 63`, if this
-  /// condition is not met, or ranges touch or overlap, radioGroup will throw.
+  /// condition is not met, or ranges touch or overlap, radioGroup will throw at
+  /// debug build or set error flag on production.
   void radioGroup(int first, int last) {
     if (first > 62 || last > 62 || last < 1 || first < 1 || first >= last) {
-      throw ('Radio range out of bounds. Valid ranges: 0 < first < last < 63');
+      _err('Bad radio range. Valid ranges: 0 < first < last < 63', last);
+      return; // do nothing on production
     }
     const emsg = 'Radio ranges may NOT overlap nor be adjacent to each other';
     var i = first;
@@ -281,11 +305,10 @@ class Togglers {
   }
 }
 
-/// The `check & fix` validator returning false will make Togglers retract
+/// The `check & fix` validator returning false will make Togglers to _retract_
 /// current change. If it returns true new state will stay and notify will fire.
 /// Validator may also tinker with state, hence Fix in name.
 typedef TogglersValidateFix = bool Function(Togglers prev, Togglers current);
 
 /// change notifier for Togglers
 typedef TogglersChangeNotify = void Function(Togglers current);
-
