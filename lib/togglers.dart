@@ -1,18 +1,15 @@
 /// Togglers keeps state of up to 63 items (flags) with built-in support for
-/// _radio-button_ type groups and independent _enable_/_disable_ semantics
-/// for UI use.  Each Togglers item on/off state can be retrieved using index[]
+/// _radio-button_ type groups and for independent _enable_/_disable_ semantics
+/// of GUI use.  Each Togglers item on/off state can be retrieved using index[]
 /// operator, usually using symbolic names (const ints in 0..62 range).
 ///
-/// Togglers library supports pre commit state validation and fixes, then it
-/// can notify outer world of changes.
+/// Togglers library supports pre-commit state validation and fixes, and after
+/// new state is applied the outer code will be notified.
 ///
-/// Togglers library has less than 140 lines of pure Dart code and zero
-/// dependencies. Even on a `dart:` standard libs.
+/// `Togglers` is small, has no dependecies (not even on a `dart:`mlibraries),
+/// and is meant to be used in "ambient" (singleton based) Models. For this
+/// `Togglers` supports data race detection, abiding to "abandon older" principle.
 ///
-/// Togglers library is meant to be used in "ambient", aka "singleton" Models:
-/// without proper detection hunting for heisenbugs caused by races on an
-/// "ambient" state would not be possible. Hence Togglers comes also with
-/// rudimentary data race detection, abiding to "abandon older" principle.
 library togglers;
 
 /// class Togglers {
