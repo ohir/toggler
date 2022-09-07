@@ -41,12 +41,14 @@ void main() {
     return true; // accept changes
   }
 
-  final flags = Togglers(notify: ourNotify, check: ourCheck);
+  final flags = Togglers(notify: ourNotify, checkFix: ourCheck);
 
+  // declare a radioGroup, up to 21 groups can be made over 63 items.
   flags.radioGroup(ktgNameD, ktgNameF);
+  // fiddle:
   print('Trying to set A (ourCheck validator disallows this)');
   flags.set(ktgNameA);
-  print('Set 0');
+  print('Set 0, NameA can be set only if Name0 was set before');
   flags.set(ktgName0);
   print('Now A is allowed to be toggled');
   flags.set(ktgNameA);

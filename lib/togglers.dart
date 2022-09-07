@@ -34,56 +34,42 @@ class Togglers {
   /// Hh keeps changes counter and keeps a list of most recent 'changed' indice.
   int hh;
 
-  /// Check'n'fix validator: bool check(Togglers prev, Togglers current) {};
-  /// where `prev` argument keeps a previous Togglers state and `current`
-  /// references current (live) Togglers object with state changed.
-  /// Check should return true to have changes stay and notification recipient
-  /// called, and return false should changes needs to be retracted.
+  /// CheckFix validator: bool checkFix(Togglers oldState, Togglers newState)
+  /// If CheckFix returns false, changes to the live Togglers are abandoned.
   ///
-  /// Check function may NOT make changes to the `current` Togglers object
-  /// as it would then be recursively called again. To alter (fix) current state
-  /// it MAY change the COPY it got as 'prev' argument; then it MAY update live
-  /// object using its `updateFromCopy` method:
+  /// CheckFix may mutate newState prior to returning. Any changes made will be
+  /// applied to the live Togglers object in a single run upon 'true' return.
+  ///
   /// ```Dart
-  /// bool check(Togglers pt, Togglers cu) {
-  ///   // pt is a copy of the previous state, cu is the current live object,
+  /// bool checkFix(Togglers oS, Togglers nS) {
   ///   // ...perform checks...
   ///   // ...seems that backend altered the ktgFreeUser flag...
   ///
-  ///   if (cu[ktgFreeUser] && cu.hasActive(ktgDoNotShowBanners)) {
-  ///
+  ///   if (nS[ktgFreeUser] && nS.hasActive(ktgDoNotShowBanners)) {
   ///     // disable Ad opt-outs for free users:
-  ///     pt.syncFrom(cu); // sync state, pt now is our scratchpad of cu
-  ///     pt.disable(ktgDoNotShowBanners);
-  ///     pt.disable(ktgDoNotShowInterst);
-  ///     pt.off(ktgDoNotShowBanners);
-  ///     pt.off(ktgDoNotShowInterst);
-  ///
-  ///     // apply changes to our live Togglers, check for races too:
-  ///     if (!cu.updateFromCopy(pt)) {
-  ///       raceDetected();
-  ///       return false;
-  ///     }
+  ///     nS.disable(ktgDoNotShowBanners);
+  ///     nS.disable(ktgDoNotShowInterst);
+  ///     nS.clear(ktgDoNotShowBanners);
+  ///     nS.clear(ktgDoNotShowInterst);
   ///   }
   ///   return true; // say OK
   /// }
   /// ```
-  TogglersValidateFix? check;
+  TogglersValidateFix? checkFix;
 
   /// change notifier function `void Function(Togglers current)`;
   /// If notifier is set, Togglers object is said to be "live" one, otherwise
-  /// it is a scratchpad data object, usually used to make many consecutive
-  /// changes further applied to the live Togglers via `updateFromCopy` call.
+  /// it is just a state object.
   TogglersChangeNotify? notify;
 
   /// ```
-  ///   check:  verify or fix state  check(previous, current)
-  ///   notify: call after change     notify(current)
-  ///   tg, ds, rm, keep the state;   hh changes for each notify
+  ///   checkFix:  verify and fix state  checkFix(oldState, newState)
+  ///   notify: call after change        notify(currentState)
+  ///   tg, ds, rm, keep the state,      hh changes for each notify
   /// ```
   /// )
   Togglers({
-    this.check,
+    this.checkFix,
     this.notify,
     this.tg = 0,
     this.ds = 0,
@@ -108,6 +94,23 @@ class Togglers {
           ((hh.toUnsigned(24) << 6) | i.toUnsigned(6));
       notify!(this);
     }
+  }
+
+  bool _ckFix(Togglers newS) {
+    // assert(checkFix != null, '_ckFix called for null checkFix');
+    final oldS = Togglers(tg: tg, ds: ds, rm: rm, hh: hh);
+    if (checkFix!(oldS, newS)) {
+      if (hh != newS.hh) {
+        ds |= 1 << 63; // clear with: x.ds = x.ds.toUnsigned(63);
+        _err('Data race on update spotted!', hh.toUnsigned(30));
+        return false;
+      }
+      tg = newS.tg;
+      ds = newS.ds;
+      rm = newS.rm;
+      return true;
+    }
+    return false;
   }
 
   /// Error flag is set if index was not in 0..62 range, or if race occured.
@@ -156,7 +159,7 @@ class Togglers {
   ///   ...
   ///   return (flags[ktgFreeUser])
   ///      ? const IconFree(...)
-  ///      : const IconPU(...),
+  ///      : const IconPaid(...),
   /// ```
   bool operator [](int i) => tg & (1 << _v(i)) != 0;
 
@@ -167,45 +170,45 @@ class Togglers {
   /// method `on` sets item at index i
   void set(int i) {
     i = _v(i);
-    int prev = tg;
+    int ntg = tg;
     if (rm & (1 << i) != 0) {
+      // clear all in this radio group
       int k = i;
       int n = 1 << i;
-      // clear all in this radio group
       while (k < 63 && rm & n != 0) {
-        tg &= ~n;
+        ntg &= ~n;
         n <<= 1;
         k++;
       }
       k = i;
       n = 1 << i;
       while (k >= 0 && rm & n != 0) {
-        tg &= ~n;
+        ntg &= ~n;
         n >>= 1;
         k--;
       }
     }
-    tg |= 1 << i;
-    if (tg != prev) {
-      if (check == null ||
-          check!(Togglers(tg: prev, ds: ds, rm: rm, hh: hh), this)) {
+    ntg |= 1 << i;
+    if (ntg != tg) {
+      if (checkFix == null) {
+        tg = ntg;
         _notify(i);
-      } else {
-        tg = prev; // check returned false
+      } else if (_ckFix(Togglers(tg: ntg, ds: ds, rm: rm, hh: hh))) {
+        _notify(i);
       }
     }
   }
 
   /// clears item at index i
   void clear(int i) {
-    int prev = tg;
-    tg &= ~(1 << _v(i));
-    if (tg != prev) {
-      if (check == null ||
-          check!(Togglers(tg: prev, ds: ds, rm: rm, hh: hh), this)) {
+    int ntg = tg;
+    ntg &= ~(1 << _v(i));
+    if (ntg != tg) {
+      if (checkFix == null) {
+        tg = ntg;
         _notify(i);
-      } else {
-        tg = prev; // check returned false
+      } else if (_ckFix(Togglers(tg: ntg, ds: ds, rm: rm, hh: hh))) {
+        _notify(i);
       }
     }
   }
@@ -227,13 +230,13 @@ class Togglers {
   void toggle(int i, {bool ifActive = false}) {
     if (ifActive && !hasActive(i)) return;
     if (tg & (1 << _v(i)) != 0) {
-      int prev = tg;
-      tg &= ~(1 << i);
-      if (check == null ||
-          check!(Togglers(tg: prev, ds: ds, rm: rm, hh: hh), this)) {
+      int ntg = tg;
+      ntg &= ~(1 << i);
+      if (checkFix == null) {
+        tg = ntg;
         _notify(i);
-      } else {
-        tg = prev;
+      } else if (_ckFix(Togglers(tg: ntg, ds: ds, rm: rm, hh: hh))) {
+        _notify(i);
       }
     } else {
       set(i);
@@ -248,18 +251,18 @@ class Togglers {
 
   /// set enable (true) or disable(false) state
   void setDS(int i, bool state) {
-    int prev = ds;
+    int nds = ds;
     if (state) {
-      ds &= ~(1 << _v(i)); // 0:enabled
+      nds &= ~(1 << _v(i)); // 0:enabled
     } else {
-      ds |= 1 << _v(i); // 1:disabled
+      nds |= 1 << _v(i); // 1:disabled
     }
-    if (ds != prev) {
-      if (check == null ||
-          check!(Togglers(tg: tg, ds: prev, rm: rm, hh: hh), this)) {
+    if (nds != ds) {
+      if (checkFix == null) {
+        ds = nds;
         _notify(i);
-      } else {
-        ds = prev;
+      } else if (_ckFix(Togglers(tg: tg, ds: nds, rm: rm, hh: hh))) {
+        _notify(i);
       }
     }
   }
