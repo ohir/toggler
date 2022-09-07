@@ -223,29 +223,29 @@ class Togglers {
     if (nds != ds) _ckFix(i, nds, true);
   }
 
-  /// radioGroup declares a range of items that have "only one of" behaviour.
+  /// radioGroup declares a range of items that have "one of" behaviour.
   /// Ranges may not overlap nor even be adjacent. Ie. there must be at least
-  /// one non-grouped item placed between two radio groups. Eg. ranges 1..3 and
-  /// 5..7 (gap at 4) are OK but 1..3 and 4..6 are NOT (no 3 to 4 gap).
+  /// one non-grouped item placed between two radio groups. Eg. ranges 0..3 and
+  /// 5..7 (gap at 4) are OK but 0..3 and 4..6 are NOT (no 3 to 4 gap).
   /// Gap index is fully usable for an independent item.
   ///
-  /// Allowed group boundaries assertion is: `0 < first < last < 63`, if this
-  /// condition is not met, or ranges touch or overlap, radioGroup will throw at
-  /// debug build or it will set error flag on production.
+  /// Allowed group boundaries are: `0 <= first < last < 63`, if this condition
+  /// is not met, or ranges touch or overlap, radioGroup will throw on debug
+  /// build, or it will set error flag on production.
   void radioGroup(int first, int last) {
-    if (first > 62 || last > 62 || last < 1 || first < 1 || first >= last) {
+    if (first > 62 || last > 62 || last < 0 || first < 0 || first >= last) {
       assert(false,
-          'Bad radio range. Valid ranges: 0 < first < last < 63 | first:$first last:$last');
+          'Bad radio range. Valid ranges: 0 <= first < last < 63 | first:$first last:$last');
       _seterr();
       return; // do nothing on production
     }
     var nrm = rm;
     var i = first;
-    var c = 1 << (first - 1);
+    var c = 1 << (first - (i == 0 ? 0 : 1));
     bool overlap() {
-      assert(rm & c == 0,
-          'Radio ranges may NOT overlap nor be adjacent to each other (Error at $i $c $rm [$first..$last])');
       if (rm & c != 0) {
+        assert(false,
+            'Radio ranges may NOT overlap nor be adjacent to each other [$first..$last])');
         _seterr();
         return true;
       }
@@ -253,7 +253,7 @@ class Togglers {
     }
 
     if (overlap()) return; // i-1
-    c <<= 1;
+    if (i > 0) c <<= 1;
     while (true) {
       if (overlap()) return; // i
       if (i > last) break;
