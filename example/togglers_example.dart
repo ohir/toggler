@@ -1,41 +1,43 @@
 import 'package:togglers/togglers.dart';
 
 void main() {
-  void ourNotify(Togglers cu) {
+  void ourNotify(_, Togglers cu) {
     var tg = '    set: ';
     var ds = ' active: ';
     for (int i = 0; i < 27; i++) {
       tg += cu[i] ? ' ^' : ' -';
       ds += cu.hasActive(i) ? ' .' : ' !';
     }
-    print('ktgName:  0 A B C D E F G H I J K L M N O P Q R S T U W V X Y Z');
+    print('kTGname:  0 A B C D E F G H I J K L M N O P Q R S T U W V X Y Z');
     print(tg);
     print(ds);
     print('          -----------------------------------------------------');
   }
 
+  /*void ourChgNotifier(Togglers oS, Togglers nS) {
+    // final chVN = ValueNotifier<int>(0);
+    if (toggledInRange(oS, nS, first: kTGnameC, last: kTGnameH)) {
+      // chVN = nS.hh // hh is guaranteed to be unique on each change
+    }
+  }*/
+
   // pt is a copy of previous state, cu is the current (live) state
-  bool ourCheck(Togglers pt, Togglers cu) {
+  bool ourCheck(Togglers oS, Togglers nS) {
     // validate: 'NameA' can toggle only if 'Name0' was set.
-    if (!pt[ktgName0] && pt[ktgNameA] != cu[ktgNameA]) {
-      print('      >>> NameA change retracted');
+    if (!oS[kTGname0] && oS[kTGnameA] != nS[kTGnameA]) {
+      print('      >>> NameA change supressed by validator');
       return false; // disallow change to 'NameA'
     }
-    // fix state: disable B,C if F radio is set
-    pt.syncFrom(cu); // update old state copy to current state
-    if (pt[ktgNameF]) {
-      pt.disable(ktgNameB);
-      pt.disable(ktgNameC);
-      pt.clear(ktgNameB);
-      pt.clear(ktgNameC);
-      cu.updateFromCopy(pt);
-    } else if (!pt.hasActive(ktgNameB) || !pt.hasActive(ktgNameC)) {
-      pt.enable(ktgNameB);
-      pt.enable(ktgNameC);
-      if (!cu.updateFromCopy(pt)) {
-        // raceDetected!
-        // data races may happen if code in Check called async code and other
-        // piece of code altered our state in meantime.
+    // fix B,C if F radio was toggled
+    if (oS[kTGnameF] != nS[kTGnameF]) {
+      if (nS[kTGnameF]) {
+        nS.disable(kTGnameB);
+        nS.disable(kTGnameC);
+        nS.clear(kTGnameB);
+        nS.clear(kTGnameC);
+      } else {
+        nS.enable(kTGnameB);
+        nS.enable(kTGnameC);
       }
     }
     return true; // accept changes
@@ -44,52 +46,52 @@ void main() {
   final flags = Togglers(notify: ourNotify, checkFix: ourCheck);
 
   // declare a radioGroup, up to 21 groups can be made over 63 items.
-  flags.radioGroup(ktgNameD, ktgNameF);
+  flags.radioGroup(kTGnameD, kTGnameF);
   // fiddle:
   print('Trying to set A (ourCheck validator disallows this)');
-  flags.set(ktgNameA);
+  flags.set(kTGnameA);
   print('Set 0, NameA can be set only if Name0 was set before');
-  flags.set(ktgName0);
+  flags.set(kTGname0);
   print('Now A is allowed to be toggled');
-  flags.set(ktgNameA);
+  flags.set(kTGnameA);
   print('Set B');
-  flags.set(ktgNameB);
+  flags.set(kTGnameB);
   print('Set C');
-  flags.set(ktgNameC);
+  flags.set(kTGnameC);
   print('Set D (of D..F radio group)');
-  flags.set(ktgNameD);
+  flags.set(kTGnameD);
   print('Set E of radio D..F - D will clear automatically.');
-  flags.set(ktgNameE);
+  flags.set(kTGnameE);
   print('Set F radio. E will clear then B and C are disabled by ourCheck');
-  flags.set(ktgNameF);
+  flags.set(kTGnameF);
   print('Set D radio. F will clear; then B and C are enabled by ourCheck');
-  flags.set(ktgNameD);
+  flags.set(kTGnameD);
 }
 
-const ktgName0 = 0;
-const ktgNameA = 1;
-const ktgNameB = 2;
-const ktgNameC = 3;
-const ktgNameD = 4;
-const ktgNameE = 5;
-const ktgNameF = 6;
-const ktgNameG = 7;
-const ktgNameH = 8;
-const ktgNameI = 9;
-const ktgNameJ = 10;
-const ktgNameK = 11;
-const ktgNameL = 12;
-const ktgNameM = 13;
-const ktgNameN = 14;
-const ktgNameO = 15;
-const ktgNameP = 16;
-const ktgNameQ = 17;
-const ktgNameR = 18;
-const ktgNameS = 19;
-const ktgNameT = 20;
-const ktgNameU = 21;
-const ktgNameW = 22;
-const ktgNameV = 23;
-const ktgNameX = 24;
-const ktgNameY = 25;
-const ktgNameZ = 26;
+const kTGname0 = 0;
+const kTGnameA = 1;
+const kTGnameB = 2;
+const kTGnameC = 3;
+const kTGnameD = 4;
+const kTGnameE = 5;
+const kTGnameF = 6;
+const kTGnameG = 7;
+const kTGnameH = 8;
+const kTGnameI = 9;
+const kTGnameJ = 10;
+const kTGnameK = 11;
+const kTGnameL = 12;
+const kTGnameM = 13;
+const kTGnameN = 14;
+const kTGnameO = 15;
+const kTGnameP = 16;
+const kTGnameQ = 17;
+const kTGnameR = 18;
+const kTGnameS = 19;
+const kTGnameT = 20;
+const kTGnameU = 21;
+const kTGnameW = 22;
+const kTGnameV = 23;
+const kTGnameX = 24;
+const kTGnameY = 25;
+const kTGnameZ = 26;
