@@ -6,18 +6,17 @@
 /// Toggler library supports pre-commit state validation and fixes, and after
 /// new state is applied the outer code will be notified.
 ///
-/// `Toggler` is small, has no dependecies (not even on a `dart:`mlibraries),
+/// `Toggler` is small, has no dependecies, not even on a `dart:` libraries,
 /// and is meant to be used in "ambient" (singleton based) Models. For this
 /// `Toggler` supports data race detection, abiding to "abandon older" principle.
-///
 library toggler;
 
 /// class Toggler {
 /// ```
-///   tg: int items_state    (0: false/cleared, 1: true/set)
+///   tg: int items_state    (0: false/cleared,  1: true/set)
 ///   ds: int items_active,  (0: active/enabled, 1: inactive/disabled)
 ///   rm: int grouping,      (1: a radio group member)
-///   hh: int history_hash,  (34b counter, 6 indice of most recent changes)
+///   hh: int history_hash,  (hi 33b change counter, lo 30b changes history)
 ///   checkFix:  bool validator(oldState, newState)
 ///   notify:    void  notifier(oldState, current)
 /// ```
@@ -33,7 +32,10 @@ class Toggler {
   int rm;
 
   /// history hash, updated for "live" Toggler (ie. having a non-null notifier).
-  /// Hh keeps changes counter and keeps a list of most recent 'changed' indice.
+  /// Hh keeps changes 33b counter and a list of 5 most recent changes indice.
+  /// Hh is guaranteed to be unique for over 8 billion toggles, thus it can be
+  /// used to seed ValueNotifiers in 'observer' based App state management.
+  /// See Flutter example.
   int hh;
 
   /// CheckFix validator: `bool checkFix(Toggler oldState, Toggler newState)`
@@ -96,9 +98,9 @@ class Toggler {
       if (checkFix!(oldS, newS)) {
         if (hh != newS.hh) {
           ds |= 1 << 63; // clear with: x.ds = x.ds.toUnsigned(63);
+          _seterr();
           assert(hh == newS.hh,
               'Data race detected on _ckFix update! [hh: ${hh.toUnsigned(30)}]');
-          _seterr();
           return;
         }
         tg = newS.tg;
@@ -109,7 +111,7 @@ class Toggler {
       isDs ? ds = nEW : tg = nEW;
     }
     if (notify != null) {
-      hh = (((hh >> 30) + 1) << 30) |
+      hh = (((hh.toUnsigned(63) >> 30) + 1) << 30) |
           ((hh.toUnsigned(24) << 6) | i.toUnsigned(6));
       notify!(oldS, this);
     }
@@ -131,16 +133,19 @@ class Toggler {
 
   /// provides an index of a last singular change coming from the outer code.
   /// Indice of following changes (by the checkFix fixer) are not preserved.
-  /// The `hh` member keeps history of most recent five outer changes.
+  /// The `hh` member keeps history of five most recent changes.
   int get lastChangeIndex => hh.toUnsigned(6);
 
-  /// Index operator returns true if Toggler item is set at given index.
-  /// Usually index number is provided as a constant for symbolic name:
+  /// Index operator returns true if Toggler item is set at given index
+  /// (usually const int for a symbolic name). Example with get_it_mixin:
   /// ```Dart
-  ///   final flags = Toggler();
-  ///   const kTG_freeUser = 11;
+  ///   const kTG_freeUser = 11; // in common code
+  ///   final flags = Toggler(); // in model.dart
   ///   ...
-  ///   return (flags[kTG_freeUser])
+  ///   final flags = getX((Model m) => m.flags);
+  ///   watchX((Model m) => m.flChg); // flChg is a simple ValueNotifier
+  ///   ...
+  ///   return (flags[kTG_freeUser])  // <= Toggler was designed for this
   ///      ? const IconFree(...)
   ///      : const IconPaid(...),
   /// ```
@@ -231,9 +236,9 @@ class Toggler {
   /// build, or it will set error flag on production.
   void radioGroup(int first, int last) {
     if (first > 62 || last > 62 || last < 0 || first < 0 || first >= last) {
+      _seterr();
       assert(false,
           'Bad radio range. Valid ranges: 0 <= first < last < 63 | first:$first last:$last');
-      _seterr();
       return; // do nothing on production
     }
     var nrm = rm;
@@ -241,9 +246,9 @@ class Toggler {
     var c = 1 << (first - (i == 0 ? 0 : 1));
     bool overlap() {
       if (rm & c != 0) {
+        _seterr();
         assert(false,
             'Radio ranges may NOT overlap nor be adjacent to each other [$first..$last])');
-        _seterr();
         return true;
       }
       return false;
@@ -279,8 +284,8 @@ class Toggler {
 
   /// returns true if state of this and other differs, possibly within a given
   /// indice range first..last (inclusive).
-  /// This can be used to fire distinct ChangeNotifiers for a subset of
-  /// Toggler' items:
+  /// This can be used to separately fire distinct ChangeNotifiers for a subsets
+  /// of Toggler's state:
   /// ```Dart
   ///
   /// ```

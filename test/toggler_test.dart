@@ -9,15 +9,74 @@ void main() {
 
     setUp(() {
       flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
-      // Additional setup goes here.
-      // flags.radioGroup(1, 3);
-      // flags.radioGroup(5, 7);
     });
 
     test('Set 0 62', () {
       flags.set(0);
       flags.set(62);
-      expect(flags[0] && flags[62], isTrue);
+      expect(flags[0] && !flags[1] && !flags[61] && flags[62], isTrue);
+      flags.clear(0);
+      flags.clear(62);
+      expect(!flags[0] && !flags[62], isTrue);
+    });
+    test('Is Set in range set boundry', () {
+      flags.set(7);
+      flags.set(12);
+      expect(flags.setInRange(first: 7, last: 10), isTrue);
+      expect(flags.setInRange(first: 8, last: 12), isTrue);
+    });
+    test('Is Set in range not set boundary', () {
+      flags.set(7);
+      flags.set(12);
+      expect(flags.setInRange(first: 8, last: 11), isFalse);
+    });
+    test('DisableEnable', () {
+      flags.disable(0);
+      expect(flags.hasActive(0), isFalse);
+      flags.set(0, ifActive: true);
+      expect(flags[0], isFalse);
+      flags.enable(0);
+      flags.set(0, ifActive: true);
+      expect(flags[0], isTrue);
+    });
+    test('Disable 62', () {
+      flags.set(62);
+      flags.disable(62);
+      flags.clear(62, ifActive: true);
+      flags.setTo(62, false, ifActive: true);
+      expect(flags[62], isTrue);
+      flags.setTo(62, false);
+      expect(flags[62], isFalse);
+    });
+    test('DisableEnable 55', () {
+      flags.disable(55);
+      flags.set(55, ifActive: true);
+      expect(flags[55], isFalse);
+      flags.setTo(55, true, ifActive: true);
+      expect(flags[55], isFalse);
+      flags.enable(55);
+      flags.set(55, ifActive: true);
+      expect(flags[55], isTrue);
+    });
+    test('DisableEnable 33', () {
+      flags.set(33, ifActive: true);
+      flags.disable(33);
+      flags.clear(33, ifActive: true);
+      expect(flags[33], isTrue);
+      flags.setTo(33, false, ifActive: true);
+      expect(flags[33], isTrue);
+      flags.enable(33);
+      flags.clear(33, ifActive: true);
+      expect(flags[33], isFalse);
+    });
+    test('Toggle 0', () {
+      flags.disable(0);
+      flags.toggle(0, ifActive: true);
+      expect(flags[0], isFalse);
+      flags.toggle(0);
+      expect(flags[0], isTrue);
+      flags.toggle(0);
+      expect(flags[0], isFalse);
     });
     test('Set 63 | should throw', () {
       expect(() {
@@ -86,6 +145,59 @@ void main() {
       flags.set(kI);
       expect(flags[kA] && flags[kH] && flags[kD] && flags[kI], isTrue);
     });
+  });
+  group('Errs', () {
+    final flags = Toggler();
+
+    setUp(() {
+      flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
+      flags.tg |= 1 << 63; // set err
+      flags.ds |= 1 << 63; // set race
+    });
+    test('Race/Err getters', () {
+      expect(flags.error, isTrue);
+      expect(flags.race, isTrue);
+    });
+    test('Demand bad diff| should throw', () {
+      expect(() {
+        flags.differsFrom(flags, last: 63);
+      }, throwsAssertionError);
+    });
+  });
+  group('FixNotifyRaces', () {
+    int last = 0;
+    void chnote(Toggler oS, Toggler nS) => last++;
+
+    bool chfix(Toggler oS, Toggler nS) {
+      if (nS.lastChangeIndex == 25) nS.hh <<= 1;
+      oS.differsFrom(nS, first: 11, last: 16);
+      if (nS[1] && nS.differsFrom(oS)) nS.set(0);
+      return true;
+    }
+
+    final flags = Toggler(notify: chnote, checkFix: chfix);
+
+    setUp(() {
+      flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
+    });
+    test('Notify 0', () {
+      flags.set(0);
+      expect(flags[0] && !flags[1], isTrue);
+      expect(last == 1, isTrue);
+    });
+    test('Notify 1', () {
+      flags.set(1);
+      expect(last == 2, isTrue);
+      expect(flags[0] && flags[1], isTrue);
+    });
+    test('Make artificial race | should throw', () {
+      expect(() {
+        flags.set(25);
+        flags.set(0);
+      }, throwsAssertionError);
+    });
+    // TODOx Make real racing test to hit `if (hh != newS.hh)` in _ckFix
+    //
   });
 }
 
