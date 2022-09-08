@@ -1,7 +1,8 @@
 name: toggler
-description: Model class for wiring up to 63 Flags, Switches, Checkboxes, Indicators, Buttons, and Radio-Button items. For use with Get_it_mixin or any other state management library.
+description: Model of 'togglable items', with support for state transitions and change notifications. Backing Flutter UI with Switches, Checkboxes, Indicators, Buttons, and Radio-Button elements. 
 version: 1.0.0
-homepage: https://github.com/ohir/togglers
+homepage: https://github.com/ohir/toggler
+repository: https://github.com/ohir/toggler
 
 environment:
   sdk: '>=2.18.0 <3.0.0'
@@ -9,3 +10,4 @@ environment:
 dev_dependencies:
   lints: ^2.0.0
   test: ^1.16.0
+
