@@ -6,7 +6,7 @@ void main() {
     var ds = ' active: ';
     for (int i = 0; i < 27; i++) {
       tg += cu[i] ? ' ^' : ' -';
-      ds += cu.hasActive(i) ? ' .' : ' !';
+      ds += cu.active(i) ? ' .' : ' !';
     }
     print('kTGname:  0 A B C D E F G H I J K L M N O P Q R S T U W V X Y Z');
     print(tg);

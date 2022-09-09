@@ -22,17 +22,17 @@ void main() {
     test('Is Set in range set boundry', () {
       flags.set(7);
       flags.set(12);
-      expect(flags.setInRange(first: 7, last: 10), isTrue);
-      expect(flags.setInRange(first: 8, last: 12), isTrue);
+      expect(flags.anySetInRange(first: 7, last: 10), isTrue);
+      expect(flags.anySetInRange(first: 8, last: 12), isTrue);
     });
     test('Is Set in range not set boundary', () {
       flags.set(7);
       flags.set(12);
-      expect(flags.setInRange(first: 8, last: 11), isFalse);
+      expect(flags.anySetInRange(first: 8, last: 11), isFalse);
     });
     test('DisableEnable', () {
       flags.disable(0);
-      expect(flags.hasActive(0), isFalse);
+      expect(flags.active(0), isFalse);
       flags.set(0, ifActive: true);
       expect(flags[0], isFalse);
       flags.enable(0);
@@ -77,6 +77,41 @@ void main() {
       expect(flags[0], isTrue);
       flags.toggle(0);
       expect(flags[0], isFalse);
+    });
+    // test('name ', () {});
+    test('generational behaviour', () {
+      var cLive = Toggler(notify: (Toggler a, Toggler b) => a.isOlderThan(b));
+      var c0 = cLive.state();
+      var c1 = cLive.state();
+      cLive.set(7);
+      var c2 = cLive.state();
+      cLive.clear(1);
+      expect(c1.isOlderThan(c2), isTrue); // copy to copy
+      expect(c2.isOlderThan(c1), isFalse); // copy to copy
+      expect(c2.isOlderThan(c2), isFalse); // copy to copy
+
+      var cL2 = Toggler(notify: (Toggler a, Toggler b) => a.isOlderThan(b));
+      var c4 = cLive.state();
+      expect(cLive.isOlderThan(cL2), isFalse); // live to live, always false
+      expect(c4.isOlderThan(cL2), isTrue); // copy to live, always true
+
+      c0.set(15);
+      expect(c0.hh == c1.hh, isTrue); // copies may not alter history
+      expect(c0.serial == c1.serial, isTrue);
+      expect(c0.lastChangeIndex == c1.lastChangeIndex, isTrue);
+    });
+    test('Differs', () {
+      var c1 = flags.state();
+      expect(c1.differsFrom(flags), isFalse);
+      c1.set(5);
+      expect(c1.differsFrom(flags), isTrue);
+      flags.set(5);
+      expect(c1.differsFrom(flags), isFalse);
+      flags.set(8);
+      c1.set(23);
+      expect(c1.differsFrom(flags, first: 8, last: 22), isTrue);
+      expect(c1.differsFrom(flags, first: 9, last: 22), isFalse);
+      expect(c1.differsFrom(flags, first: 9, last: 23), isTrue);
     });
     test('Set 63 | should throw', () {
       expect(() {
@@ -160,7 +195,7 @@ void main() {
     });
     test('Demand bad diff| should throw', () {
       expect(() {
-        flags.differsFrom(flags, last: 63);
+        flags.differsFrom(flags.state(), last: 63);
       }, throwsAssertionError);
     });
   });
@@ -190,6 +225,12 @@ void main() {
       expect(last == 2, isTrue);
       expect(flags[0] && flags[1], isTrue);
     });
+    test('Notify via clone', () {
+      var nf = flags.clone();
+      nf.set(5);
+      expect(nf[5] && !flags[5], isTrue);
+      expect(last == 3, isTrue);
+    });
     test('Make artificial race | should throw', () {
       expect(() {
         flags.set(25);
@@ -197,7 +238,6 @@ void main() {
       }, throwsAssertionError);
     });
     // TODOx Make real racing test to hit `if (hh != newS.hh)` in _ckFix
-    //
   });
 }
 

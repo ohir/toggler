@@ -1,86 +1,66 @@
-/// Toggler keeps state of up to 63 items (flags) with built-in support for
-/// _radio-button_ type groups and for independent _enable_/_disable_ semantics
-/// of GUI use.  Each Toggler item on/off state can be retrieved using index[]
-/// operator, usually using symbolic names (const ints in 0..62 range).
+/// Toggler library is a complete "App boolean state" solution designed for use
+/// in "ambient" (singleton) Models, but it also supports _reactive_ architecture
+/// via its `state` and `clone` copying constructors. For safe use in a
+/// singleton Toggler has built-in data race detection and automatic abandon of
+/// an outdated change.
 ///
-/// Toggler library supports pre-commit state validation and fixes, and after
-/// new state is applied the outer code will be notified.
-///
-/// `Toggler` is small, has no dependecies, not even on a `dart:` libraries,
-/// and is meant to be used in "ambient" (singleton based) Models. For this
-/// `Toggler` supports data race detection, abiding to "abandon older" principle.
+/// Toggler supports pre-commit state validation and mutation, and it fires state
+/// change notifications on commit. It is small, fast, and it has no
+/// dependecies.
 library toggler;
 
-/// class Toggler {
-/// ```
-///   tg: int items_state    (0: false/cleared,  1: true/set)
-///   ds: int items_active,  (0: active/enabled, 1: inactive/disabled)
-///   rm: int grouping,      (1: a radio group member)
-///   hh: int history_hash,  (hi 33b change counter, lo 30b changes history)
-///   checkFix:  bool validator(oldState, newState)
-///   notify:    void  notifier(oldState, current)
-/// ```
-/// }
+/// Toggler class keeps state of up to 63 boolean values (items) that can be
+/// manipulated one by one, or in concert. _Radio group_ behaviour can be
+/// declared on up to 20 separated groups of items. Independent _disabled_ flag
+/// is avaliable for every item, to be used in UI builders.  Each value can be
+/// retrieved using index[] operator, usually with a constant symbolic name.
 class Toggler {
-  /// items state (0:off/cleared, 1:on/set)
-  int tg;
+  /// togglee item 0..62 value bit     1:set 0:cleared
+  int tg; //
+  /// togglee item 0..62 disable bit   1:disabled 0:enabled
+  int ds; //
+  /// radio-groups 0..62 mask   1:member of adjacent 1s group
+  int rm; //
+  /// unique history hash and `serial` counter updated on each notify call
+  int hh; //
 
-  /// disabled state (0:enabled/active, 1:disabled/inactive)
-  int ds;
-
-  /// radio groups configuration (1: marks a radio group member)
-  int rm;
-
-  /// history hash, updated for "live" Toggler (ie. having a non-null notifier).
-  /// Hh keeps changes 33b counter and a list of 5 most recent changes indice.
-  /// Hh is guaranteed to be unique for over 8 billion toggles, thus it can be
-  /// used to seed ValueNotifiers in 'observer' based App state management.
-  /// See Flutter example.
-  int hh;
-
-  /// CheckFix validator: `bool checkFix(Toggler oldState, Toggler newState)`
-  /// If checkFix returns false changes to the live Toggler are abandoned.
+  /// `void Function(Toggler oldState, Toggler current)`
+  /// notify is called after change to the Toggler state (`tg`, `ds`) has been
+  /// commited.  Note, that _radioGroup_ setup calls do not call _notify_.
   ///
-  /// CheckFix may mutate newState prior to returning. Any changes made will be
-  /// applied to the live Toggler object in a single run upon 'true' return:
-  ///
-  /// ```Dart
-  /// bool checkFix(Toggler oS, Toggler nS) {
-  ///   // ...perform checks...
-  ///   // ...seems that backend altered the kTG_freeUser flag...
-  ///
-  ///   if (nS[kTG_freeUser] && nS.hasActive(kTG_doNotShowBanners)) {
-  ///     // disable Ad opt-outs for free users:
-  ///     nS.disable(kTG_doNotShowBanners);
-  ///     nS.disable(kTG_doNotShowInterst);
-  ///     nS.clear(kTG_doNotShowBanners);
-  ///     nS.clear(kTG_doNotShowInterst);
-  ///   }
-  ///   return true; // apply changes
-  /// }
-  /// ```
-  TogglerValidateFix? checkFix;
-
-  /// change notifier function `void Function(Toggler current)`;
-  /// If notifier is set, Toggler object is said to be "live" one, otherwise
-  /// it is just a state object.
+  /// Toggler object with a non-null notifier is said to be a _live_ one,
+  /// otherwise object is said to be a _state copy_.
   TogglerChangeNotify? notify;
 
-  /// ```
-  ///   checkFix: verify and fix state   checkFix(oldState, newState)
-  ///     notify: call after change         notify(oldState, current)
-  ///      state: tg, ds, rm
-  ///   identity: hh                 unique for each next notify call
-  /// ```
-  /// )
+  /// `bool checkFix(Toggler oldState, Toggler newState)`
+  /// validates pending newState and possibly mutates it further.
+  /// Upon _true_ return new state will be applied to the live Toggler object
+  /// in a single run. Changes will be abandoned if `checkFix` returns _false_.
+  /// If `checkFix` is not given (_null_), every single state change is commited
+  /// immediately.
+  TogglerValidateFix? checkFix;
+
+  /// All members are public for easy tests and serialization.
+  /// Note: the `hh` member keeps identity bits (serial and change history) -
+  /// whether it should be serialized and restored depends on App's state
+  /// management architecture used.
   Toggler({
-    this.checkFix,
     this.notify,
+    this.checkFix,
     this.tg = 0,
     this.ds = 0,
     this.rm = 0,
     this.hh = 0,
   });
+
+  /// get copy of the state. Returned new _Toggler_ has _notify_ and _checkFix_
+  /// fields set to `null`.
+  Toggler state() => Toggler(tg: tg, ds: ds, rm: rm, hh: hh);
+
+  /// returns deep copy of the Toggler, including `notify` and `checkFix`
+  /// function pointers. _Here be dragons!_
+  Toggler clone() => Toggler(
+      tg: tg, ds: ds, rm: rm, hh: hh, notify: notify, checkFix: checkFix);
 
   void _seterr() => tg |= 1 << 63; // clear with: x.tg = x.tg.toUnsigned(63);
 
@@ -100,7 +80,7 @@ class Toggler {
           ds |= 1 << 63; // clear with: x.ds = x.ds.toUnsigned(63);
           _seterr();
           assert(hh == newS.hh,
-              'Data race detected on _ckFix update! [hh: ${hh.toUnsigned(30)}]');
+              'Data race detected on _ckFix update! [history: ${hh.toUnsigned(24)}]');
           return;
         }
         tg = newS.tg;
@@ -111,53 +91,55 @@ class Toggler {
       isDs ? ds = nEW : tg = nEW;
     }
     if (notify != null) {
-      hh = (((hh.toUnsigned(63) >> 30) + 1) << 30) |
-          ((hh.toUnsigned(24) << 6) | i.toUnsigned(6));
+      hh = (((hh.toUnsigned(63) >> 24) + 1) << 24) |
+          ((hh.toUnsigned(18) << 6) | i.toUnsigned(6));
       notify!(oldS, this);
     }
   }
 
-  /// Error flag is set if index was not in 0..62 range, or if race occured.
-  /// In production code it is prudent to check error sparsely, eg. on leaving
-  /// a route (if error happened it means your tests are broken - in debug mode
-  /// assertion should threw. Error flag clear: `x.tg = x.tg.toUnsigned(63);`)
+  /// Error flag is set if index was not in 0..62 range, or data race occured.
+  /// In release code it is prudent to check error sparsely, eg. on leaving
+  /// a route (if error happened it means your tests are broken - as in debug builds
+  /// an assertion should threw. Clear error flag with: `x.tg = x.tg.toUnsigned(63);`)
   bool get error => tg & 1 << 63 != 0;
 
   /// Race flag is set if Toggler live object was modified while `checkFix`
-  /// has been doing changes based on the older state. If such race occurs,
+  /// has been doing changes based on the older state. If such a race occurs,
   /// changes based on older state are **not** applied (are lost).
   /// Races should not happen with checkFix calling only sync code, but may
   /// happen if checkFix awaited for something slow.
-  /// You may clear race flag using: `x.ds = x.ds.toUnsigned(63);` code.
+  /// You may clear race flag using: `x.ds = x.ds.toUnsigned(63);` code.
   bool get race => ds & 1 << 63 != 0;
 
-  /// provides an index of a last singular change coming from the outer code.
-  /// Indice of following changes (by the checkFix fixer) are not preserved.
-  /// The `hh` member keeps history of five most recent changes.
+  /// provides an index of a last singular change coming from the outer code (
+  /// ie. indice of related changes made by `checkFix` are not preserved).
+  /// Note that on the copied state objects `lastChangeIndex` value is frozen
+  /// to the value origin had at copy creation time.
   int get lastChangeIndex => hh.toUnsigned(6);
 
-  /// Index operator returns true if Toggler item is set at given index
-  /// (usually const int for a symbolic name). Example with get_it_mixin:
-  /// ```Dart
-  ///   const kTG_freeUser = 11; // in common code
-  ///   final flags = Toggler(); // in model.dart
-  ///   ...
-  ///   final flags = getX((Model m) => m.flags);
-  ///   watchX((Model m) => m.flChg); // flChg is a simple ValueNotifier
-  ///   ...
-  ///   return (flags[kTG_freeUser])  // <= Toggler was designed for this
-  ///      ? const IconFree(...)
-  ///      : const IconPaid(...),
-  /// ```
+  /// monotonic counter of changes. Increased on each `notify` call. In state
+  /// copies `serial` is frozen to the value origin had at copy creation time.
+  int get serial => hh >> 24;
+
+  /// _true_ if other copy has been created after us. A live Toggler object can
+  /// never be older than a copy or other live Toggler.
+  bool isOlderThan(Toggler other) => notify != null
+      ? false
+      : other.notify != null
+          ? true
+          : hh >> 24 < other.hh >> 24;
+
+  /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
   bool operator [](int i) => tg & (1 << _v(i)) != 0;
 
-  /// hasActive returns true if Toggler item at index `i` is enabled
-  /// `if (flags.hasActive(kTG_premium)) {...}`
-  bool hasActive(int i) => ds & (1 << _v(i)) == 0;
+  /// _true_ if Toggler item at index `i` is enabled
+  bool active(int i) => ds & (1 << _v(i)) == 0;
 
-  /// set (on:true) item at index i
+  /// set (_1_, _on_, _true_) item at index `i`.
+  /// Optional argument `ifActive: true` permits change only if item is enabled,
+  /// By default state changes are not suppressed by the _disable_ flag.
   void set(int i, {bool ifActive = false}) {
-    if (ifActive && !hasActive(i)) return;
+    if (ifActive && !active(i)) return;
     i = _v(i);
     int ntg = tg;
     if (rm & (1 << i) != 0) {
@@ -181,28 +163,30 @@ class Toggler {
     if (ntg != tg) _ckFix(i, ntg, false);
   }
 
-  /// clears item at index i
+  /// clear (to _0_, _off_, _false_ state) item at index `i`.
+  /// Optional argument `ifActive: true` permits change only if item is enabled,
+  /// By default state changes are not suppressed by the _disable_ flag.
   void clear(int i, {bool ifActive = false}) {
-    if (ifActive && !hasActive(i)) return;
+    if (ifActive && !active(i)) return;
     int ntg = tg;
     ntg &= ~(1 << _v(i));
     if (ntg != tg) _ckFix(i, ntg, false);
   }
 
-  /// method `setTo` sets item at index i to the explicit state on:true or off:false.
-  /// Optional argument `ifActive: true` allows changes only of an Active item.
+  /// sets item state at index `i` to the explicit given value.
+  /// Optional argument `ifActive: true` allows changes only of an active item.
   void setTo(int i, bool state, {bool ifActive = false}) {
-    if (ifActive && !hasActive(i)) return;
+    if (ifActive && !active(i)) return;
     state ? set(i) : clear(i);
   }
 
   /// toggle changes item at index i to the opposite state.
   /// Note that toggle does not know about radio groups by itself
-  /// so toggle on an active radio will make all in group being off!
-  /// Programmatic changes do not take 'disabled' status into account
-  /// unless explicitly wanted by passing ifActive: true.
+  /// so toggle on an active radio will make all in group being off.
+  /// Programmatic changes do not take _disabled_ status into account
+  /// unless explicitly wanted by passing `ifActive: true`.
   void toggle(int i, {bool ifActive = false}) {
-    if (ifActive && !hasActive(i)) return;
+    if (ifActive && !active(i)) return;
     if (tg & (1 << _v(i)) != 0) {
       int ntg = tg;
       ntg &= ~(1 << i);
@@ -212,13 +196,13 @@ class Toggler {
     }
   }
 
-  /// enable item at index i
+  /// enable item at index `i`
   void enable(int i) => setDS(i, true);
 
-  /// disable item at index i
+  /// disable item at index `i`
   void disable(int i) => setDS(i, false);
 
-  /// enable (true) or disable (false) an item at index i
+  /// enable (true) or disable (false) an item at index `i`
   void setDS(int i, bool enable) {
     int nds = ds;
     enable ? nds &= ~(1 << _v(i)) : nds |= 1 << _v(i);
@@ -234,6 +218,9 @@ class Toggler {
   /// Allowed group boundaries are: `0 <= first < last < 63`, if this condition
   /// is not met, or ranges touch or overlap, radioGroup will throw on debug
   /// build, or it will set error flag on production.
+  ///
+  /// A radioGroup creation does not `notify`. Any number of calls to radioGroup
+  /// can be replaced by assigning a predefined constant to the `rm` member.
   void radioGroup(int first, int last) {
     if (first > 62 || last > 62 || last < 0 || first < 0 || first >= last) {
       _seterr();
@@ -266,10 +253,10 @@ class Toggler {
     rm = nrm;
   }
 
-  /// returns true if any item is set, possibly within a given range (inclusive)
-  /// It eg. can be used to test whether user made a choice tapping on a button
-  /// in a radio group that initially had all items off.
-  bool setInRange({int first = 0, last = 62}) {
+  /// _true_ if any item is set, optionally only within _first..last_ range
+  /// (inclusive). Eg. it can be used to test whether user made a choice tapping
+  /// on a button in an initiall all-off radio group.
+  bool anySetInRange({int first = 0, last = 62}) {
     _v(first);
     _v(last);
     if (first > last) return false;
@@ -282,13 +269,9 @@ class Toggler {
     return false;
   }
 
-  /// returns true if state of this and other differs, possibly within a given
-  /// indice range first..last (inclusive).
-  /// This can be used to separately fire distinct ChangeNotifiers for a subsets
-  /// of Toggler's state:
-  /// ```Dart
-  ///
-  /// ```
+  /// _true_ if state of `this` and `other` differs, possibly only within a given
+  /// range _first..last_ (inclusive).  This can be used to fire ChangeNotifiers
+  /// distinct for a provided range of a common to the App single Toggler state.
   bool differsFrom(Toggler other, {int first = 0, int last = 62}) {
     if (first > 62 || last > 62 || last < 0 || first < 0 || first > last) {
       assert(false, 'Bad range. Valid ranges: 0 <= first <= last < 63');
@@ -314,14 +297,8 @@ class Toggler {
   }
 }
 
-/// The `check & fix` validator returning false will make Toggler to abandon
-/// pending change. If it returns true new state will be applied and ChangeNotify
-/// will fire.  Validator may also tinker with state, hence Fix in name.
+/// `checkFix` function signature
 typedef TogglerValidateFix = bool Function(Toggler oldState, Toggler newState);
 
-/// Change notifier for Toggler is provided both oldState (copy) and current
-/// object. It allows for static wiring into many Flutter state management
-/// libraries like `provider` or `get_it_mixin`. Having both old and current
-/// state at hand allows for pushing a fine-grained change notifications from
-/// a single Toggler object.
+/// `notify` function signature
 typedef TogglerChangeNotify = void Function(Toggler oldState, Toggler current);
