@@ -22,13 +22,13 @@ void main() {
     test('Is Set in range set boundry', () {
       flags.set(7);
       flags.set(12);
-      expect(flags.anySetInRange(first: 7, last: 10), isTrue);
-      expect(flags.anySetInRange(first: 8, last: 12), isTrue);
+      expect(flags.anyInSet(first: 7, last: 10), isTrue);
+      expect(flags.anyInSet(first: 8, last: 12), isTrue);
     });
     test('Is Set in range not set boundary', () {
       flags.set(7);
       flags.set(12);
-      expect(flags.anySetInRange(first: 8, last: 11), isFalse);
+      expect(flags.anyInSet(first: 8, last: 11), isFalse);
     });
     test('DisableEnable', () {
       flags.disable(0);
@@ -186,10 +186,10 @@ void main() {
 
     setUp(() {
       flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
-      flags.tg |= 1 << 63; // set err
-      flags.ds |= 1 << 63; // set race
     });
-    test('Race/Err getters', () {
+    test('Race/Err set/get', () {
+      flags.error = true;
+      flags.race = true;
       expect(flags.error, isTrue);
       expect(flags.race, isTrue);
     });

@@ -1,12 +1,12 @@
-/// Toggler library is a complete "App boolean state" solution designed for use
-/// in "ambient" (singleton) Models, but it also supports _reactive_ architecture
-/// via its `state` and `clone` copying constructors. For safe use in a
-/// singleton Toggler has built-in data race detection and automatic abandon of
-/// an outdated change.
+/// Toggler library can be a part of state management solution. It is designed
+/// for use in "ambient" (singleton) Models but it also may support _reactive_
+/// architectures via its `state` and `clone` copying constructors.
+/// For safe use in a singleton Toggler has built-in data race detection and
+/// automatic abandon of an outdated change.
 ///
-/// Toggler supports pre-commit state validation and mutation, and it fires state
-/// change notifications on commit. It is small, fast, and it has no
-/// dependecies.
+/// Toggler supports pre-commit state validation and mutation; then it fires
+/// change notifications on a new state commit. Toggler is small, fast, and it has
+/// no dependecies.
 library toggler;
 
 /// Toggler class keeps state of up to 63 boolean values (items) that can be
@@ -15,18 +15,18 @@ library toggler;
 /// is avaliable for every item, to be used in UI builders.  Each value can be
 /// retrieved using index[] operator, usually with a constant symbolic name.
 class Toggler {
-  /// togglee item 0..62 value bit     1:set 0:cleared
+  /// togglee item 0..62 value bit:     1:set 0:cleared
   int tg; //
-  /// togglee item 0..62 disable bit   1:disabled 0:enabled
+  /// togglee item 0..62 disable bit:   1:disabled 0:enabled
   int ds; //
-  /// radio-groups 0..62 mask   1:member of adjacent 1s group
+  /// radio-groups 0..62 mask:          1:member of adjacent 1s group
   int rm; //
-  /// unique history hash and `serial` counter updated on each notify call
+  /// history hash and `serial` counter - updated on each notify call
   int hh; //
 
   /// `void Function(Toggler oldState, Toggler current)`
   /// notify is called after change to the Toggler state (`tg`, `ds`) has been
-  /// commited.  Note, that _radioGroup_ setup calls do not call _notify_.
+  /// commited.
   ///
   /// Toggler object with a non-null notifier is said to be a _live_ one,
   /// otherwise object is said to be a _state copy_.
@@ -40,10 +40,11 @@ class Toggler {
   /// immediately.
   TogglerValidateFix? checkFix;
 
-  /// All members are public for easy tests and serialization.
-  /// Note: the `hh` member keeps identity bits (serial and change history) -
-  /// whether it should be serialized and restored depends on App's state
-  /// management architecture used.
+  /// All Toggler members are public for easy tests and custom serialization.
+  ///
+  /// Note: _the `hh` member keeps state identity bits (serial and history tail).
+  /// Whether it should be serialized and restored depends on App's state
+  /// management architecture used._
   Toggler({
     this.notify,
     this.checkFix,
@@ -60,7 +61,7 @@ class Toggler {
   /// returns deep copy of the Toggler, including `notify` and `checkFix`
   /// function pointers. _Here be dragons!_
   Toggler clone() => Toggler(
-      tg: tg, ds: ds, rm: rm, hh: hh, notify: notify, checkFix: checkFix);
+      tg: tg, ds: ds, hh: hh, rm: rm, notify: notify, checkFix: checkFix);
 
   void _seterr() => tg |= 1 << 63; // clear with: x.tg = x.tg.toUnsigned(63);
 
@@ -100,16 +101,17 @@ class Toggler {
   /// Error flag is set if index was not in 0..62 range, or data race occured.
   /// In release code it is prudent to check error sparsely, eg. on leaving
   /// a route (if error happened it means your tests are broken - as in debug builds
-  /// an assertion should threw. Clear error flag with: `x.tg = x.tg.toUnsigned(63);`)
+  /// an assertion should threw.
   bool get error => tg & 1 << 63 != 0;
+  set error(bool e) => e ? tg |= 1 << 63 : tg = tg.toUnsigned(63);
 
   /// Race flag is set if Toggler live object was modified while `checkFix`
   /// has been doing changes based on the older state. If such a race occurs,
   /// changes based on older state are **not** applied (are lost).
   /// Races should not happen with checkFix calling only sync code, but may
   /// happen if checkFix awaited for something slow.
-  /// You may clear race flag using: `x.ds = x.ds.toUnsigned(63);` code.
   bool get race => ds & 1 << 63 != 0;
+  set race(bool e) => e ? ds |= 1 << 63 : ds = ds.toUnsigned(63);
 
   /// provides an index of a last singular change coming from the outer code (
   /// ie. indice of related changes made by `checkFix` are not preserved).
@@ -253,10 +255,8 @@ class Toggler {
     rm = nrm;
   }
 
-  /// _true_ if any item is set, optionally only within _first..last_ range
-  /// (inclusive). Eg. it can be used to test whether user made a choice tapping
-  /// on a button in an initiall all-off radio group.
-  bool anySetInRange({int first = 0, last = 62}) {
+  /// _true_ if any item is set, optionally in a given indice range.
+  bool anyInSet({int first = 0, last = 62}) {
     _v(first);
     _v(last);
     if (first > last) return false;
@@ -271,7 +271,7 @@ class Toggler {
 
   /// _true_ if state of `this` and `other` differs, possibly only within a given
   /// range _first..last_ (inclusive).  This can be used to fire ChangeNotifiers
-  /// distinct for a provided range of a common to the App single Toggler state.
+  /// distinct for a provided range of a common to the App Toggler state.
   bool differsFrom(Toggler other, {int first = 0, int last = 62}) {
     if (first > 62 || last > 62 || last < 0 || first < 0 || first > last) {
       assert(false, 'Bad range. Valid ranges: 0 <= first <= last < 63');
