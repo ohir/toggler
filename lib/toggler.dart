@@ -52,7 +52,9 @@ class Toggler {
     this.ds = 0,
     this.rm = 0,
     this.hh = 0,
-  });
+  }) {
+    rm.toUnsigned(63); // always clear done flag on copy/clone/deserialize
+  }
 
   /// get copy of the state. Returned new _Toggler_ has _notify_ and _checkFix_
   /// fields set to `null`.
@@ -94,6 +96,7 @@ class Toggler {
     if (notify != null) {
       hh = (((hh.toUnsigned(63) >> 24) + 1) << 24) |
           ((hh.toUnsigned(18) << 6) | i.toUnsigned(6));
+      rm = rm.toUnsigned(63); // clear done flag (just here!)
       notify!(oldS, this);
     }
   }
@@ -112,6 +115,18 @@ class Toggler {
   /// happen if checkFix awaited for something slow.
   bool get race => ds & 1 << 63 != 0;
   set race(bool e) => e ? ds |= 1 << 63 : ds = ds.toUnsigned(63);
+
+  /// Done flag can be set on a state copy to mark it as "used". Copy or clone
+  /// always will have _done_ set to false. _Done_ flag of a _live_ Toggler
+  /// object is cleared right before _notify_ call.
+  bool get done => rm & 1 << 63 != 0;
+  set done(bool e) => e ? rm |= 1 << 63 : rm = rm.toUnsigned(63);
+
+  /// _done_ flag setter that always returns _true_
+  bool setDone() {
+    rm |= 1 << 63;
+    return true;
+  }
 
   /// provides an index of a last singular change coming from the outer code (
   /// ie. indice of related changes made by `checkFix` are not preserved).

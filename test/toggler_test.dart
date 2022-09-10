@@ -181,17 +181,32 @@ void main() {
       expect(flags[kA] && flags[kH] && flags[kD] && flags[kI], isTrue);
     });
   });
-  group('Errs', () {
+  group('Diagnostics', () {
     final flags = Toggler();
 
     setUp(() {
       flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
     });
-    test('Race/Err set/get', () {
+    test('Race/Err/Done set true', () {
       flags.error = true;
       flags.race = true;
+      flags.done = true;
       expect(flags.error, isTrue);
       expect(flags.race, isTrue);
+      expect(flags.done, isTrue);
+    });
+    test('Race/Err/Done set false', () {
+      flags.error = true;
+      flags.race = true;
+      flags.done = true;
+      flags.error = false;
+      flags.race = false;
+      flags.done = false;
+      expect(flags.error, isFalse);
+      expect(flags.race, isFalse);
+      expect(flags.done, isFalse);
+      flags.setDone();
+      expect(flags.done, isTrue);
     });
     test('Demand bad diff| should throw', () {
       expect(() {

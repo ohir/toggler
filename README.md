@@ -2,7 +2,7 @@
 
 ## Features
 
-**Toggler** object keeps state of up to 63 boolean values (items) that can be manipulated one by one or in concert. _Radio group_ behaviour can be declared on up to 20 separated groups of items. Independent _disabled_ flag is avaliable for every item – to be used from within UI builders.
+**Toggler** object keeps state of up to 63 boolean values (items) that can be manipulated one by one or in concert. _Radio group_ behaviour can be declared on up to 20 separated groups of items. Independent _disabled_ property is avaliable for every item – to be used from within UI builders.
 
 **Toggler** was designed specifically for singleton _Models_ and for _observer_ style state flows, though it can be used also in _reactive_ state management architectures via its `state` and `clone` copying constructors.  For safe use within a singleton _Model_ Toggler has built-in data race detection and automatically skips changes coming from an outdated ancestor state.
 
@@ -14,14 +14,10 @@ Toggler is a single class library with no dependencies.
  1. Then import toggler for your Model: `import 'package:toggler/toggler.dart';`
  1. declare `const kTG_flagName`s that next will be used to give your knobs and their _Model_ representation clear meaning:
  ```Dart
-     const kTG_NetConnected = 0;
-     const kTG_freeUser = 1;
-     const kTG_LoggedIn = 2;
-     const kTG_NoBanners = 3;
-     const kTG_NoInterst = 4;
-     // ...
-     const kTG_Claim = 61;
-     const kTG_Prized = 62; // Single Toggler object keeps up to 63 items (flags)
+     const kTG_Connected = 0;
+     const kTG_ULoggedIn = 1;
+     const kTG_NoBanners = 2;
+     // ... up to = 62
  ```
  4. make a Toggler `var flags = Toggler();`
  5. use Toggler API:
@@ -54,9 +50,9 @@ Toggler is a single class library with no dependencies.
 ## API 101
 
 constructors:
-- `Toggler(checkFix: beforeChangeCommit, notify: afterChangeCommit)` other properties can be set too just obeing KWAYD (know what you are doing) principle - usually members are set by deserializer, and in testing. Toggler with non-null `notify` field is said to be a _live_ Toggler object.
-- `Toggler.state()` returns _non-live_ copy of the state, ie. object with both `checkFix` and `notify` fields set to null.
-- `Toggler.clone()` returns full copy of object, ie. cloned _live_ Toggler will still be _live_. This constructor is of use in very simple apps with a single InheritedWidget as state managenment solution.
+- `Toggler(checkFix: beforeChangeCommit, notify: afterChangeCommit)` Toggler object with a notifier set (non-null) is said to be _live_ one. Other state properties (`tg`,`ds`,`rm`, `hh`) can be set too, usually within saved state deserializer, and in testing.
+- `Toggler.state()` returns a _copy of state_, ie. Toggler object with both `checkFix` and `notify` set to null.
+- `Toggler.clone()` returns a deep copy of `this` source, possibly a _live_ one. _Caveat emptor_.
 
 getters:
 - `[i]` returns state of item at index i (_true_ for a set item).
