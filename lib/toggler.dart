@@ -9,21 +9,21 @@
 /// no dependecies.
 library toggler;
 
-const _b63 = 52; // dart2js
+const _b63 = 52; // dart2js int is 53 bit
 const _b62 = 51;
 const kTGindexMax = _b62;
 
 /// Toggler class keeps state of up to 52 boolean values (items) that can be
 /// manipulated one by one, or in concert. _Radio group_ behaviour can be
-/// declared on up to 20 separated groups of items. Independent _disabled_ flag
+/// declared on up to 17 separated groups of items. Independent _disabled_ flag
 /// is avaliable for every item, to be used in UI builders.  Each value can be
 /// retrieved using index[] operator, usually with a constant symbolic name.
 class Toggler {
-  /// togglee item 0..62 value bit:     1:set 0:cleared
+  /// togglee item 0..51 value bit:     1:set 0:cleared
   int tg; //
-  /// togglee item 0..62 disable bit:   1:disabled 0:enabled
+  /// togglee item 0..51 disable bit:   1:disabled 0:enabled
   int ds; //
-  /// radio-groups 0..62 mask:          1:member of adjacent 1s group
+  /// radio-groups 0..51 mask:          1:member of adjacent 1s group
   int rm; //
   /// history hash and `serial` counter - updated on each notify call
   int hh; //
@@ -71,8 +71,9 @@ class Toggler {
 
   int _v(int i) {
     assert(i < _b63 && i >= 0, 'Toggler index ($i) out of range!');
-    if (i > _b62 || i < 0) error = true;
-    return i.toUnsigned(6);
+    if (i < _b63 && i > 0) return i;
+    error = true;
+    return 0;
   }
 
   void _ckFix(int i, int nEW, bool isDs) {
@@ -86,7 +87,7 @@ class Toggler {
           Toggler(tg: isDs ? tg : nEW, ds: isDs ? nEW : ds, rm: rm, hh: nhh);
       if (fix!(oldS, newS)) {
         if (hh != oldS.hh) {
-          ds |= 1 << _b63; // clear with: x.ds = x.ds.toUnsigned(_b63);
+          ds |= 1 << _b63;
           error = true;
           assert(hh == oldS.hh,
               'Data race detected on _ckFix update! [history: ${hh.toUnsigned(18)}]');
@@ -106,7 +107,7 @@ class Toggler {
     }
   }
 
-  /// Error flag is set if index was not in 0..62 range, or data race occured.
+  /// Error flag is set if index was not in 0..51 range, or data race occured.
   /// In release code it is prudent to check error sparsely, eg. on leaving
   /// a route (if error happened it means your tests are broken - as in debug builds
   /// an assertion should threw.
@@ -138,7 +139,7 @@ class Toggler {
 
   /// monotonic counter of changes. Increased on each `notify` call. In state
   /// copies `serial` is frozen to the value origin had at copy creation time.
-  int get serial => hh >> 18;
+  int get serial => hh.toUnsigned(_b63) >> 18;
 
   /// _true_ if other copy has been created after us. A live Toggler object can
   /// never be older than a copy or other live Toggler.
@@ -234,7 +235,7 @@ class Toggler {
   /// 5..7 (gap at 4) are OK but 0..3 and 4..6 are NOT (no 3 to 4 gap).
   /// Gap index is fully usable for an independent item.
   ///
-  /// Allowed group boundaries are: `0 <= first < last < _b63`, if this condition
+  /// Allowed group boundaries are: `0 <= first < last < 53`, if this condition
   /// is not met, or ranges touch or overlap, radioGroup will throw on debug
   /// build, or it will set error flag on _release_ build.
   ///
@@ -274,8 +275,8 @@ class Toggler {
 
   /// _true_ if any item is set, optionally in a given indice range.
   bool anyInSet({int first = 0, last = _b62}) {
-    _v(first);
-    _v(last);
+    first = _v(first);
+    last = _v(last);
     if (first > last) return false;
     int n = 1 << first;
     while (first < _b63 && first <= last) {
@@ -288,12 +289,12 @@ class Toggler {
 
   /// _true_ if state of `this` and `other` differs, possibly only within a given
   /// range _first..last_ (inclusive).  This can be used to fire ChangeNotifiers
-  /// distinct for a provided range of a common to the App Toggler state.
+  /// distinct for a provided range within a common to the App Toggler state.
   bool differsFrom(Toggler other, {int first = 0, int last = _b62}) {
     if (first > _b62 || last > _b62 || last < 0 || first < 0 || first > last) {
       assert(
           false, 'Bad range. Valid ranges: 0 <= first <= last < 52web|63aot');
-      return false; // do nothing on production
+      return false; // do nothing on release
     }
     int p = first;
     int n = 1 << first;
