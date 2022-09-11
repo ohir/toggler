@@ -2,7 +2,6 @@ import 'package:toggler/toggler.dart';
 import 'package:test/test.dart';
 
 final Matcher throwsAssertionError = throwsA(isA<AssertionError>());
-
 void main() {
   group('Rudimentary', () {
     final flags = Toggler();
@@ -11,13 +10,18 @@ void main() {
       flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
     });
 
-    test('Set 0 62', () {
+    test('Set 0 Max', () {
       flags.set(0);
-      flags.set(62);
-      expect(flags[0] && !flags[1] && !flags[61] && flags[62], isTrue);
+      flags.set(kTGindexMax);
+      expect(
+          flags[0] &&
+              !flags[1] &&
+              !flags[kTGindexMax - 1] &&
+              flags[kTGindexMax],
+          isTrue);
       flags.clear(0);
-      flags.clear(62);
-      expect(!flags[0] && !flags[62], isTrue);
+      flags.clear(kTGindexMax);
+      expect(!flags[0] && !flags[kTGindexMax], isTrue);
     });
     test('Is Set in range set boundry', () {
       flags.set(7);
@@ -39,24 +43,24 @@ void main() {
       flags.set(0, ifActive: true);
       expect(flags[0], isTrue);
     });
-    test('Disable 62', () {
-      flags.set(62);
-      flags.disable(62);
-      flags.clear(62, ifActive: true);
-      flags.setTo(62, false, ifActive: true);
-      expect(flags[62], isTrue);
-      flags.setTo(62, false);
-      expect(flags[62], isFalse);
+    test('Disable Max', () {
+      flags.set(kTGindexMax);
+      flags.disable(kTGindexMax);
+      flags.clear(kTGindexMax, ifActive: true);
+      flags.setTo(kTGindexMax, false, ifActive: true);
+      expect(flags[kTGindexMax], isTrue);
+      flags.setTo(kTGindexMax, false);
+      expect(flags[kTGindexMax], isFalse);
     });
-    test('DisableEnable 55', () {
-      flags.disable(55);
-      flags.set(55, ifActive: true);
-      expect(flags[55], isFalse);
-      flags.setTo(55, true, ifActive: true);
-      expect(flags[55], isFalse);
-      flags.enable(55);
-      flags.set(55, ifActive: true);
-      expect(flags[55], isTrue);
+    test('DisableEnable Max-1', () {
+      flags.disable(kTGindexMax - 1);
+      flags.set(kTGindexMax - 1, ifActive: true);
+      expect(flags[kTGindexMax - 1], isFalse);
+      flags.setTo(kTGindexMax - 1, true, ifActive: true);
+      expect(flags[kTGindexMax - 1], isFalse);
+      flags.enable(kTGindexMax - 1);
+      flags.set(kTGindexMax - 1, ifActive: true);
+      expect(flags[kTGindexMax - 1], isTrue);
     });
     test('DisableEnable 33', () {
       flags.set(33, ifActive: true);
