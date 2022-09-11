@@ -79,26 +79,51 @@ void main() {
       expect(flags[0], isFalse);
     });
     // test('name ', () {});
-    test('generational behaviour', () {
+    test('generational behaviour [A]', () {
       var cLive = Toggler(notify: (Toggler a, Toggler b) => a.isOlderThan(b));
       var c0 = cLive.state();
       var c1 = cLive.state();
       cLive.set(7);
       var c2 = cLive.state();
       cLive.clear(1);
+      expect(c0.isOlderThan(c1), isFalse); // copy to copy
       expect(c1.isOlderThan(c2), isTrue); // copy to copy
       expect(c2.isOlderThan(c1), isFalse); // copy to copy
       expect(c2.isOlderThan(c2), isFalse); // copy to copy
-
-      var cL2 = Toggler(notify: (Toggler a, Toggler b) => a.isOlderThan(b));
+    });
+    test('generational behaviour [B]', () {
+      var cLive = Toggler(notify: (Toggler a, Toggler b) {});
+      var c0 = cLive.state();
+      var c1 = cLive.state();
+      cLive.set(7);
+      var cL2 = Toggler(notify: (Toggler a, Toggler b) {});
       var c4 = cLive.state();
       expect(cLive.isOlderThan(cL2), isFalse); // live to live, always false
       expect(c4.isOlderThan(cL2), isTrue); // copy to live, always true
 
       c0.set(15);
+      c1.set(33);
       expect(c0.hh == c1.hh, isTrue); // copies may not alter history
       expect(c0.serial == c1.serial, isTrue);
-      expect(c0.lastChangeIndex == c1.lastChangeIndex, isTrue);
+      expect(c0.recent == c1.recent, isTrue);
+    });
+    test('copy may not mutate history', () {
+      var c0 = Toggler();
+      c0.disable(3);
+      c0.set(2);
+      var c1 = c0.state();
+      c1.set(16);
+      var c2 = c1.state();
+      expect(
+          c0[2] &&
+              c1[2] &&
+              c2[2] &&
+              c1[16] &&
+              c2[16] &&
+              c0.hh == c1.hh &&
+              c2.hh == c0.hh &&
+              c2.hh == 0,
+          isTrue);
     });
     test('Differs', () {
       var c1 = flags.state();
@@ -219,13 +244,15 @@ void main() {
     void chnote(Toggler oS, Toggler nS) => last++;
 
     bool chfix(Toggler oS, Toggler nS) {
-      if (nS.lastChangeIndex == 25) nS.hh <<= 1;
-      oS.differsFrom(nS, first: 11, last: 16);
-      if (nS[1] && nS.differsFrom(oS)) nS.set(0);
+      if (oS.recent == 25) oS.hh <<= 1; // test abandon older state
+      oS.differsFrom(nS, first: 11, last: 16); // cover !differs path
+      if (nS[1] && nS.differsFrom(oS)) nS.set(0); // test state fixing on 1
+      if (nS[7] && nS.differsFrom(oS)) nS.setDone(); // test skip notify on 7
+      if (nS[9] && nS.differsFrom(oS)) nS.done = true; // test skip notify on 9
       return true;
     }
 
-    final flags = Toggler(notify: chnote, checkFix: chfix);
+    final flags = Toggler(notify: chnote, fix: chfix);
 
     setUp(() {
       flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
@@ -245,6 +272,12 @@ void main() {
       nf.set(5);
       expect(nf[5] && !flags[5], isTrue);
       expect(last == 3, isTrue);
+    });
+    test('Internal fix', () {
+      flags.set(7);
+      expect(last == 3, isTrue); // notify skipped, setDone()
+      flags.set(9);
+      expect(last == 3, isTrue); // notify skipped, done = true
     });
     test('Make artificial race | should throw', () {
       expect(() {

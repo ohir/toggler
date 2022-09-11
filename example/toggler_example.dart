@@ -43,7 +43,7 @@ void main() {
     return true; // accept changes
   }
 
-  final flags = Toggler(notify: ourNotify, checkFix: ourCheck);
+  final flags = Toggler(notify: ourNotify, fix: ourCheck);
 
   // declare a radioGroup, up to 21 groups can be made over 63 items.
   flags.radioGroup(kTGnameD, kTGnameF);

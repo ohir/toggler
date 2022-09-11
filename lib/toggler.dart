@@ -25,20 +25,20 @@ class Toggler {
   int hh; //
 
   /// `void Function(Toggler oldState, Toggler current)`
-  /// notify is called after change to the Toggler state (`tg`, `ds`) has been
-  /// commited.
+  /// notify is called after change to the Toggler state has been commited.
   ///
   /// Toggler object with a non-null notifier is said to be a _live_ one,
   /// otherwise object is said to be a _state copy_.
   TogglerChangeNotify? notify;
 
-  /// `bool checkFix(Toggler oldState, Toggler newState)`
-  /// validates pending newState and possibly mutates it further.
-  /// Upon _true_ return new state will be applied to the live Toggler object
-  /// in a single run. Changes will be abandoned if `checkFix` returns _false_.
-  /// If `checkFix` is not given (_null_), every single state change is commited
-  /// immediately.
-  TogglerValidateFix? checkFix;
+  /// Function `bool fix(Toggler oldState, Toggler newState)`
+  /// validates and possibly mutates pending _newState_. Upon _true_ return
+  /// _newState_ will be applied to the live Toggler object in a single run.
+  /// Otherwise changes will be abandoned. The `fix` may also suppress subsequent
+  /// `notify` by setting `done` on a _newState_.  If `fix` is _null_, every
+  /// single state change is commited immediately then `notify` function is
+  /// called, if provided.
+  TogglerValidateFix? fix;
 
   /// All Toggler members are public for easy tests and custom serialization.
   ///
@@ -47,7 +47,7 @@ class Toggler {
   /// management architecture used._
   Toggler({
     this.notify,
-    this.checkFix,
+    this.fix,
     this.tg = 0,
     this.ds = 0,
     this.rm = 0,
@@ -56,48 +56,49 @@ class Toggler {
     rm.toUnsigned(63); // always clear done flag on copy/clone/deserialize
   }
 
-  /// get copy of the state. Returned new _Toggler_ has _notify_ and _checkFix_
+  /// get copy of the state. Returned new _Toggler_ has _notify_ and _fix_
   /// fields set to `null`.
   Toggler state() => Toggler(tg: tg, ds: ds, rm: rm, hh: hh);
 
-  /// returns deep copy of the Toggler, including `notify` and `checkFix`
+  /// returns deep copy of the Toggler, including `notify` and `fix`
   /// function pointers. _Here be dragons!_
-  Toggler clone() => Toggler(
-      tg: tg, ds: ds, hh: hh, rm: rm, notify: notify, checkFix: checkFix);
-
-  void _seterr() => tg |= 1 << 63; // clear with: x.tg = x.tg.toUnsigned(63);
+  Toggler clone() =>
+      Toggler(tg: tg, ds: ds, hh: hh, rm: rm, notify: notify, fix: fix);
 
   int _v(int i) {
     assert(i < 63 && i >= 0, 'Toggler index ($i) out of range!');
-    if (i > 62 || i < 0) _seterr();
+    if (i > 62 || i < 0) error = true;
     return i.toUnsigned(6);
   }
 
   void _ckFix(int i, int nEW, bool isDs) {
     final oldS = Toggler(tg: tg, ds: ds, rm: rm, hh: hh);
-    if (checkFix != null) {
+    final nhh = notify == null
+        ? hh // copy of state may mutate but may not alter serial nor history
+        : (((hh.toUnsigned(63) >> 18) + 1) << 18) |
+            ((hh.toUnsigned(12) << 6) | i.toUnsigned(6));
+    if (fix != null) {
       final newS =
-          Toggler(tg: isDs ? tg : nEW, ds: isDs ? nEW : ds, rm: rm, hh: hh);
-      if (checkFix!(oldS, newS)) {
-        if (hh != newS.hh) {
+          Toggler(tg: isDs ? tg : nEW, ds: isDs ? nEW : ds, rm: rm, hh: nhh);
+      if (fix!(oldS, newS)) {
+        if (hh != oldS.hh) {
           ds |= 1 << 63; // clear with: x.ds = x.ds.toUnsigned(63);
-          _seterr();
-          assert(hh == newS.hh,
-              'Data race detected on _ckFix update! [history: ${hh.toUnsigned(24)}]');
+          error = true;
+          assert(hh == oldS.hh,
+              'Data race detected on _ckFix update! [history: ${hh.toUnsigned(18)}]');
           return;
         }
         tg = newS.tg;
         ds = newS.ds;
         rm = newS.rm;
+        hh = newS.hh;
       }
     } else {
       isDs ? ds = nEW : tg = nEW;
+      hh = nhh;
     }
     if (notify != null) {
-      hh = (((hh.toUnsigned(63) >> 24) + 1) << 24) |
-          ((hh.toUnsigned(18) << 6) | i.toUnsigned(6));
-      rm = rm.toUnsigned(63); // clear done flag (just here!)
-      notify!(oldS, this);
+      done ? rm = rm.toUnsigned(63) : notify!(oldS, this);
     }
   }
 
@@ -108,11 +109,11 @@ class Toggler {
   bool get error => tg & 1 << 63 != 0;
   set error(bool e) => e ? tg |= 1 << 63 : tg = tg.toUnsigned(63);
 
-  /// Race flag is set if Toggler live object was modified while `checkFix`
+  /// Race flag is set if Toggler live object was modified while `fix`
   /// has been doing changes based on the older state. If such a race occurs,
   /// changes based on older state are **not** applied (are lost).
-  /// Races should not happen with checkFix calling only sync code, but may
-  /// happen if checkFix awaited for something slow.
+  /// Races should not happen with fix calling only sync code, but may
+  /// happen if fix awaited for something slow.
   bool get race => ds & 1 << 63 != 0;
   set race(bool e) => e ? ds |= 1 << 63 : ds = ds.toUnsigned(63);
 
@@ -122,21 +123,18 @@ class Toggler {
   bool get done => rm & 1 << 63 != 0;
   set done(bool e) => e ? rm |= 1 << 63 : rm = rm.toUnsigned(63);
 
-  /// _done_ flag setter that always returns _true_
-  bool setDone() {
-    rm |= 1 << 63;
-    return true;
-  }
+  /// set _done_ _true_, always returns _true_
+  bool setDone() => (rm |= 1 << 63) != 0;
 
   /// provides an index of a last singular change coming from the outer code (
-  /// ie. indice of related changes made by `checkFix` are not preserved).
-  /// Note that on the copied state objects `lastChangeIndex` value is frozen
+  /// ie. indice of related changes made by `fix` are not preserved).
+  /// Note that on the copied state objects `recent` value is frozen
   /// to the value origin had at copy creation time.
-  int get lastChangeIndex => hh.toUnsigned(6);
+  int get recent => hh.toUnsigned(6);
 
   /// monotonic counter of changes. Increased on each `notify` call. In state
   /// copies `serial` is frozen to the value origin had at copy creation time.
-  int get serial => hh >> 24;
+  int get serial => hh >> 18;
 
   /// _true_ if other copy has been created after us. A live Toggler object can
   /// never be older than a copy or other live Toggler.
@@ -144,7 +142,7 @@ class Toggler {
       ? false
       : other.notify != null
           ? true
-          : hh >> 24 < other.hh >> 24;
+          : hh >> 18 < other.hh >> 18;
 
   /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
   bool operator [](int i) => tg & (1 << _v(i)) != 0;
@@ -234,23 +232,23 @@ class Toggler {
   ///
   /// Allowed group boundaries are: `0 <= first < last < 63`, if this condition
   /// is not met, or ranges touch or overlap, radioGroup will throw on debug
-  /// build, or it will set error flag on production.
+  /// build, or it will set error flag on _release_ build.
   ///
   /// A radioGroup creation does not `notify`. Any number of calls to radioGroup
   /// can be replaced by assigning a predefined constant to the `rm` member.
   void radioGroup(int first, int last) {
     if (first > 62 || last > 62 || last < 0 || first < 0 || first >= last) {
-      _seterr();
+      error = true;
       assert(false,
           'Bad radio range. Valid ranges: 0 <= first < last < 63 | first:$first last:$last');
-      return; // do nothing on production
+      return; // do nothing at release
     }
     var nrm = rm;
     var i = first;
     var c = 1 << (first - (i == 0 ? 0 : 1));
     bool overlap() {
       if (rm & c != 0) {
-        _seterr();
+        error = true;
         assert(false,
             'Radio ranges may NOT overlap nor be adjacent to each other [$first..$last])');
         return true;
@@ -312,7 +310,7 @@ class Toggler {
   }
 }
 
-/// `checkFix` function signature
+/// `fix` function signature
 typedef TogglerValidateFix = bool Function(Toggler oldState, Toggler newState);
 
 /// `notify` function signature
