@@ -6,7 +6,7 @@
 
 Toggler is a single class library with no dependencies.
 
-Test coverage: **100.0%** (133 of 133 lines)
+Test coverage: `100.0% (133 of 133 lines)`
 
 ## Getting started
 
@@ -39,12 +39,12 @@ Test coverage: **100.0%** (133 of 133 lines)
 
 ### State flow
 
-1. somewhere in your App code a state of a single item in a _live_ Toggler in Model is changed by a `toggle(flagName)` call (or `set`, `clear`, `enable`, `disable`).
+1. somewhere in your App code a state of a single item in a _live_ Toggler in Model is changed by a `toggle(flagName)` call (or other _state setters_: `set`, `clear`, `enable`, `disable`).
 2. State transition function `bool fix(oldState, newState)` is called next,
 3. then "fixed" new state is commited to the state of Toggler instance,
 4. then `notify(oldState, liveState)` is called, there Model's _ValueNotifiers_ can be updated or _notifyListeners_ called to pass "changed" baton to the Presentation layer.
 
-If `fix` handler has not been provided, any single item change made by setter is commited immediately. Otherwise `fix` is called after a change came from a setter. Then `fix` returns _true_, to have _newState_ commited; Or _false_ for changes to be abandoned.
+If `fix` handler has not been provided, any single item change made by setter is commited immediately. Otherwise `fix` is called with _newState_ reflecting change that came from a setter. Then `fix` returns _true_, to have _newState_ commited; Or _false_ for changes to be abandoned.
 
 Your code in `fix` may manipulate _newState_ at will, it even may assign a some predefined const values to the `tg` and/or `ds` properties of it. Usually `fix` is Model's internal function, so it may have access to all other pieces of your business logic.
 
@@ -57,8 +57,8 @@ After succesful new state commit `notify` is called. Within this handler you may
 #### constructors:
 - `Toggler({fix: onChange, notify: afterChange, tg: 0, ds: 0, rm: 0, hh: 0})`
   > at least `notify` is needed to make a _live_ Toggler. All other members can be given to default constructor, too - used eg. in saved state deserializer and tests. An all-default Toggler can be mutated at will, eg. in an explicit App state initializer, then `notify` and/or `fix` handlers can be attached later.
-- `Toggler.state()` returns a copy of _state_ only (ie. with `fix` = `notify` = null).
-- `Toggler.clone()` returns a deep copy of `this`. _Caveat emptor!_
+- `state()` method returns a _copy of state_ only (ie. with `fix` = `notify` = null).
+- `clone()` method returns a deep copy of `this`. _Caveat emptor!_
 
 #### getters:
 - `[i]` returns state of item at index i (_true_ for a set item).

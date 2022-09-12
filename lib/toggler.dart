@@ -1,7 +1,7 @@
 /// Toggler library can be a part of state management solution. It is designed
-/// for use in "ambient" (singleton) Models but it also may support _reactive_
+/// for use in singleton aka "ambient" Models but it also may support _reactive_
 /// architectures via its `state` and `clone` copying constructors.
-/// For safe use as singleton Toggler has built-in data race detection and
+/// For safe use as a singleton Toggler has built-in data race detection and
 /// automatic abandon of an outdated change.
 ///
 /// Toggler supports pre-commit state validation and mutation. After any single
@@ -23,7 +23,7 @@ const _b62 = 51 + _noweb; //
 const kTGindexMax = _b62;
 
 /// Toggler class keeps state of up to 52 boolean values (items) that can be
-/// manipulated one by one, or in concert. _Radio group_ behaviour can be
+/// manipulated one by one or in concert. _Radio group_ behaviour can be
 /// declared on up to 17 separated groups of items. Independent _disabled_ flag
 /// is avaliable for every item, to be used in UI builders.  Each value can be
 /// retrieved using index[] operator, usually with a constant symbolic name.
@@ -53,8 +53,8 @@ class Toggler {
 
   /// handler `bool fix(Toggler oldState, Toggler newState)`
   /// manages state transitions. Eg. enabling or disabling items if some
-  /// condition is met.  If `fix` is null, state changes from setters are
-  /// commited immediately.
+  /// condition is met.  If `fix` is null every single state change from a
+  /// setter is commited immediately.
   ///
   /// On _true_ return, _newState_ will be commited, ie. copied to the live
   /// Toggler object in a single run.  Then `notify` part will run, if present
@@ -97,7 +97,7 @@ class Toggler {
     return 0;
   }
 
-  /// Toggler change engine, exposed to allow easy testing and debugging (Apps).
+  /// Toggler change engine. Exposed only to allow straighforward testing and debugging Apps.
   /// Do not call `pump` in App code unless you really really KWYAD.
   /// For legitimate use of pump see `replay(cas)` method in example TogglerRx
   /// extension
@@ -165,7 +165,7 @@ class Toggler {
   set error(bool e) => e ? tg |= 1 << _b63 : tg = tg.toUnsigned(_b62);
 
   /// set internally if Toggler live object was modified while `fix`
-  /// has been doing changes based on the older state.
+  /// has been doing changes based on an older state.
   ///
   /// If such a race occurs, changes based on older state are **not** applied
   /// (are lost).  Races should not happen with fix calling only sync code, but
@@ -173,17 +173,17 @@ class Toggler {
   bool get race => ds & 1 << _b63 != 0;
   set race(bool e) => e ? ds |= 1 << _b63 : ds = ds.toUnsigned(_b62);
 
-  /// _compact action byte_ of the most recent change  coming from a state setter.
+  /// _compact action byte_ of the most recent change coming from a state setter.
   ///
   /// CAbyte keep _incoming_ changes, not ones made internally by `fix`.
   /// CAbyte layout: `(0/1) b7:tg/ds b6:clear/set b5..b0 change index`
   int get cabyte => hh.toUnsigned(8);
 
-  /// index of most recent change coming from a state setter
+  /// index of the most recent change coming from a state setter
   int get recent => hh.toUnsigned(6);
 
-  /// monotonic counter of changes. Increased on each `notify` call. In state
-  /// copies `serial` is frozen to the value origin had at copy creation time.
+  /// monotonic counter of changes increased on each state change. In state
+  /// copies `serial` is frozen at value origin had at copy creation time.
   int get serial => hh.toUnsigned(_b63) >> 16;
 
   /// _true_ if other copy has been created after us. A live Toggler object can
