@@ -6,6 +6,8 @@
 
 Toggler is a single class library with no dependencies.
 
+Test coverage: **100.0%** (133 of 133 lines)
+
 ## Getting started
 
  1. `$> dart pub get toggler`

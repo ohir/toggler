@@ -10,7 +10,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: 100.0% (129 of 129 lines)
+/// Test coverage: 100.0% (133 of 133 lines)
 library toggler;
 
 const _noweb = 0; // 0:web 10:noWeb
@@ -39,24 +39,22 @@ class Toggler {
   /// radio-groups 0..51 mask:          1:member of adjacent 1s group
   int rm;
 
-  /// history hash and `serial` counter - updated on each fix or notify call
+  /// history hash keeps `serial`, `cabyte`, and `recent` values.
+  /// Live Toggler updates `hh` on each state change. State copies have `hh`
+  /// frozen at values origin had at copy creation time.
   ///
   /// Note: Whether `hh` should be serialized and restored depends on App's state
   /// management architecture used.
   int hh;
 
-  /// `void notify(Toggler oldState, Toggler current)`
+  /// handler `void notify(Toggler oldState, Toggler current)`
   /// is called after state change has been _commited_.
   TogglerChangeNotify? notify;
 
-  /// `bool fix(Toggler oldState, Toggler newState)`
+  /// handler `bool fix(Toggler oldState, Toggler newState)`
   /// manages state transitions. Eg. enabling or disabling items if some
-  /// condition is met.  If not given (fix == null), every single state change
-  /// is commited immediately.
-  ///
-  /// validates and possibly mutates pending _newState_. In simpler Apps `fix`
-  /// state handler is the only place where business-logic is implemented and where
-  /// Model state transitions occur.
+  /// condition is met.  If `fix` is null, state changes from setters are
+  /// commited immediately.
   ///
   /// On _true_ return, _newState_ will be commited, ie. copied to the live
   /// Toggler object in a single run.  Then `notify` part will run, if present
@@ -65,6 +63,11 @@ class Toggler {
   /// A `fix` code may suppress subsequent `notify` call by setting _done_ flag
   /// on a _newState_. This internal _done_ state is not copied to the live
   /// Toggler on commit.
+  ///
+  /// In simpler Apps `fix` state handler is the only place where business-logic
+  /// is implemented and where Model state transitions occur. In _reactive_
+  /// state management, usually `notify` is null and `fix` alone sends state
+  /// copies up some Stream.
   TogglerValidateFix? fix;
 
   /// All Toggler members are public for easy tests and custom serialization.
@@ -76,10 +79,10 @@ class Toggler {
     this.rm = 0,
     this.hh = 0,
   }) {
-    rm.toUnsigned(_b63); // always clear done flag on copy/clone/deserialize
+    rm = rm.toUnsigned(_b62); // never copy with done
   }
 
-  /// get copy of the state: _done_ flag and transition handlers are cleared.
+  /// get copy of the state: _done_ flag and handlers are cleared.
   Toggler state() => Toggler(tg: tg, ds: ds, rm: rm, hh: hh);
 
   /// returns a deep copy of the Toggler, including `notify` and `fix`
@@ -94,10 +97,10 @@ class Toggler {
     return 0;
   }
 
-  /// change engine, exposed to allow easy testing and debugging (Apps).
-  /// Do not call this in App code unless you keep to KWYAD principle.
-  /// See TogglerRx extension, `replay(cas)` method in examples for
-  /// legitimate use of pump.
+  /// Toggler change engine, exposed to allow easy testing and debugging (Apps).
+  /// Do not call `pump` in App code unless you really really KWYAD.
+  /// For legitimate use of pump see `replay(cas)` method in example TogglerRx
+  /// extension
   void pump(int i, int nEW, bool isDs, bool actSet) {
     if (notify == null && fix == null) {
       isDs ? ds = nEW : tg = nEW;
@@ -105,12 +108,11 @@ class Toggler {
     }
     final oldS = Toggler(tg: tg, ds: ds, rm: rm, hh: hh);
     if (done) oldS.setDone(); // fix and notify should know
-    /// `b7:tg0/ds1 b6:clear0/set1 b5..b0 index`
     final nhh = (((hh.toUnsigned(_b63) >> 16) + 1) << 16) |
         ((hh.toUnsigned(8) << 8) |
-            (isDs ? (1 << 7) : 0) |
-            (actSet ? (1 << 6) : 0) |
-            i.toUnsigned(6));
+            (isDs ? (1 << 7) : 0) | //   b7: tg/ds
+            (actSet ? (1 << 6) : 0) | // b6: clear/set
+            i.toUnsigned(6)); //     b5..b0: item index
     if (fix != null) {
       final newS =
           Toggler(tg: isDs ? tg : nEW, ds: isDs ? nEW : ds, rm: rm, hh: nhh);
@@ -129,11 +131,11 @@ class Toggler {
       }
     } else {
       hh = nhh;
-      rm = rm.toUnsigned(_b63);
+      rm = rm.toUnsigned(_b62);
       isDs ? ds = nEW : tg = nEW;
     }
     if (notify != null) {
-      done ? rm = rm.toUnsigned(_b63) : notify!(oldS, this);
+      done ? rm = rm.toUnsigned(_b62) : notify!(oldS, this);
     }
   }
 
@@ -141,15 +143,15 @@ class Toggler {
   /// will be cleared at state change, ie. right after a setter runs.
   ///
   /// Both `fix` and `notify` handlers may test _oldState_ whether _done_ was
-  /// set.  The `fix` mutator may also set _done_ on a _newState_ to suppress
+  /// set.  The `fix` handler may also set _done_ on a _newState_ to suppress
   /// subsequent _notify_ (_done_ from `fix` does __not__ make to the commited
   /// new state).
   ///
   /// In _reactive_ settings _done_ flag can be set on a state clone to mark it
   /// as "being spent". Note that _done_ flag __always__ comes cleared on all new
-  /// copies and clones - whether made of live object or a state copy.
+  /// copies and clones - whether made of live object or of a state copy.
   bool get done => rm & 1 << _b63 != 0;
-  set done(bool e) => e ? rm |= 1 << _b63 : rm = rm.toUnsigned(_b63);
+  set done(bool e) => e ? rm |= 1 << _b63 : rm = rm.toUnsigned(_b62);
 
   /// sets done, returns true - for `setDone() ? : ` constructs.
   bool setDone() => (rm |= 1 << _b63) != 0;
@@ -160,7 +162,7 @@ class Toggler {
   /// a route (if error happened it means your tests are broken - as in debug builds
   /// an assertion should threw.
   bool get error => tg & 1 << _b63 != 0;
-  set error(bool e) => e ? tg |= 1 << _b63 : tg = tg.toUnsigned(_b63);
+  set error(bool e) => e ? tg |= 1 << _b63 : tg = tg.toUnsigned(_b62);
 
   /// set internally if Toggler live object was modified while `fix`
   /// has been doing changes based on the older state.
@@ -169,17 +171,16 @@ class Toggler {
   /// (are lost).  Races should not happen with fix calling only sync code, but
   /// may happen if fix awaited for something slow.
   bool get race => ds & 1 << _b63 != 0;
-  set race(bool e) => e ? ds |= 1 << _b63 : ds = ds.toUnsigned(_b63);
+  set race(bool e) => e ? ds |= 1 << _b63 : ds = ds.toUnsigned(_b62);
 
-  /// a `compact action` CAS byte of the most recent singular change.
-  /// On state copies `recent` value is frozen to the value origin had at copy
-  /// creation time.
+  /// _compact action byte_ of the most recent change  coming from a state setter.
   ///
-  /// CAS keep _incoming_ changes, not ones made internally by `fix`.
-  /// CAS layout: `(0/1) b7:tg/ds b6:clear/set b5..b0 change index`
-  /// See TogglerRx extension `replay(cas)` method in examples.
-  ///
-  int get recent => hh.toUnsigned(8);
+  /// CAbyte keep _incoming_ changes, not ones made internally by `fix`.
+  /// CAbyte layout: `(0/1) b7:tg/ds b6:clear/set b5..b0 change index`
+  int get cabyte => hh.toUnsigned(8);
+
+  /// index of most recent change coming from a state setter
+  int get recent => hh.toUnsigned(6);
 
   /// monotonic counter of changes. Increased on each `notify` call. In state
   /// copies `serial` is frozen to the value origin had at copy creation time.

@@ -3,7 +3,7 @@ import 'package:test/test.dart';
 
 final Matcher throwsAssertionError = throwsA(isA<AssertionError>());
 void main() {
-  group('Rudimentary', () {
+  group('Rudimentary :: ', () {
     final flags = Toggler();
 
     setUp(() {
@@ -110,6 +110,7 @@ void main() {
       expect(c0.hh == c1.hh, isTrue); // copies may not alter history
       expect(c0.serial == c1.serial, isTrue);
       expect(c0.recent == c1.recent, isTrue);
+      expect(c0.recent == c1.cabyte.toUnsigned(6), isTrue);
     });
     test('copy may not mutate history', () {
       var c0 = Toggler();
@@ -153,7 +154,7 @@ void main() {
       }, throwsAssertionError);
     });
   });
-  group('Radio', () {
+  group('Radio :: ', () {
     final flags = Toggler();
 
     setUp(() {
@@ -210,7 +211,7 @@ void main() {
       expect(flags[kA] && flags[kH] && flags[kD] && flags[kI], isTrue);
     });
   });
-  group('Diagnostics', () {
+  group('Diagnostics :: ', () {
     final flags = Toggler();
 
     setUp(() {
@@ -243,12 +244,107 @@ void main() {
       }, throwsAssertionError);
     });
   });
-  group('FixNotifyRaces', () {
+  group('Done and history :: ', () {
+    // ensure
+    int ntlast = 0;
+    int filast = 0;
+    void chnote(Toggler oS, Toggler nS) => ntlast++;
+
+    bool chfix(Toggler oS, Toggler nS) {
+      filast++;
+      return true;
+    }
+
+    final flags = Toggler();
+    const ohh = 7777777777;
+    setUp(() {
+      flags.tg = flags.ds = flags.rm = 0;
+      flags.hh = ohh;
+      flags.fix = chfix;
+      flags.notify = chnote;
+      ntlast = 0;
+      filast = 0;
+    });
+
+    test('no history changes', () {
+      flags.notify = null;
+      flags.fix = null;
+      flags.toggle(5);
+      expect(flags[5] && flags.hh == ohh, isTrue);
+    });
+    test('done is cleared with copy', () {
+      flags.setDone();
+      final c1 = flags.state();
+      expect(flags != c1, isTrue);
+      expect(flags.done, isTrue);
+      expect(c1.done, isFalse);
+    });
+    test('done is cleared with clone', () {
+      flags.setDone();
+      final c1 = flags.clone();
+      expect(flags.done, isTrue);
+      expect(c1.done, isFalse);
+    });
+    test('done is cleared on copy of copy', () {
+      final c1 = flags.state();
+      c1.done = true;
+      expect(c1.done, isTrue);
+      final c2 = c1.state();
+      expect(c2.done, isFalse);
+    });
+    test('history changes with just fix', () {
+      flags.notify = null;
+      flags.toggle(5);
+      expect(flags[5], isTrue);
+      expect(flags.hh != ohh, isTrue);
+      expect(filast, equals(1));
+    });
+    test('history changes with just notify', () {
+      flags.fix = null;
+      flags.toggle(5);
+      expect(flags[5] && flags.hh != ohh, isTrue);
+      expect(ntlast, equals(1));
+    });
+    test('done is cleared on fix only', () {
+      flags.notify = null;
+      expect(flags.done, isFalse);
+      flags.setDone();
+      expect(flags.done, isTrue);
+      flags.toggle(5);
+      expect(flags.done, isFalse);
+      flags.done = true;
+      expect(flags.done, isTrue);
+      flags.toggle(5);
+      expect(flags.done, isFalse);
+      expect(!flags[5] && flags.hh != ohh, isTrue);
+      expect(ntlast, equals(0));
+      expect(filast, equals(2));
+    });
+    test('done is cleared on notify only', () {
+      flags.fix = null;
+      expect(flags.done, isFalse);
+      flags.setDone();
+      expect(flags.done, isTrue);
+      flags.toggle(5);
+      expect(flags.done, isFalse);
+      flags.done = true;
+      expect(flags.done, isTrue);
+      flags.toggle(5);
+      expect(flags.done, isFalse);
+      expect(!flags[5] && flags.hh != ohh, isTrue);
+      expect(ntlast, equals(2));
+      expect(filast, equals(0));
+    });
+    /*
+    */
+  });
+
+  group('FixNotifyRaces :: ', () {
     int last = 0;
     void chnote(Toggler oS, Toggler nS) => last++;
 
     bool chfix(Toggler oS, Toggler nS) {
-      if (oS.recent.toUnsigned(6) == 25) {
+      if (oS.recent == 25) {
         oS.hh <<= 1; // test abandon older state
       }
       oS.differsFrom(nS, first: 11, last: 16); // cover !differs path
