@@ -63,6 +63,7 @@ void main() {
 
 /// for use in Rx settings state methods can be added as an extension
 extension TogglerRx on Toggler {
+  /// apply externally mutated state to the _Model_ object.
   bool apply(Toggler src, {bool doNotify = true, bool force = false}) {
     if (!force && hh > src.hh) return false;
     Toggler? oldS;
@@ -74,6 +75,9 @@ extension TogglerRx on Toggler {
     if (doNotify && notify != null) notify!(oldS!, this);
     return true;
   }
+
+  /// remove handlers from clone, you may also want to call setDone()
+  void freeze() => fix = notify = null;
 }
 
 /// always use symbolic index
