@@ -14,13 +14,6 @@ void main() {
     print('          -----------------------------------------------------');
   }
 
-  /*void ourChgNotifier(Toggler oS, Toggler nS) {
-    // final chVN = ValueNotifier<int>(0);
-    if (toggledInRange(oS, nS, first: kTGnameC, last: kTGnameH)) {
-      // chVN = nS.hh // hh is guaranteed to be unique on each change
-    }
-  }*/
-
   // pt is a copy of previous state, cu is the current (live) state
   bool ourCheck(Toggler oS, Toggler nS) {
     // validate: 'NameA' can toggle only if 'Name0' was set.
@@ -45,7 +38,7 @@ void main() {
 
   final flags = Toggler(notify: ourNotify, fix: ourCheck);
 
-  // declare a radioGroup, up to 21 groups can be made over 63 items.
+  // declare a radioGroup, up to 17 groups can be made over 51 items.
   flags.radioGroup(kTGnameD, kTGnameF);
   // fiddle:
   print('Trying to set A (ourCheck validator disallows this)');
@@ -68,6 +61,22 @@ void main() {
   flags.set(kTGnameD);
 }
 
+/// for use in Rx settings state methods can be added as an extension
+extension TogglerRx on Toggler {
+  bool apply(Toggler src, {bool doNotify = true, bool force = false}) {
+    if (!force && hh > src.hh) return false;
+    Toggler? oldS;
+    if (doNotify && notify != null) oldS = state();
+    tg = src.tg;
+    ds = src.ds;
+    rm = src.rm;
+    hh = src.hh;
+    if (doNotify && notify != null) notify!(oldS!, this);
+    return true;
+  }
+}
+
+/// always use symbolic index
 const kTGname0 = 0;
 const kTGnameA = 1;
 const kTGnameB = 2;
