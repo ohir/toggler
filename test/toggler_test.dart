@@ -248,7 +248,9 @@ void main() {
     void chnote(Toggler oS, Toggler nS) => last++;
 
     bool chfix(Toggler oS, Toggler nS) {
-      if (oS.recent == 25) oS.hh <<= 1; // test abandon older state
+      if (oS.recent.toUnsigned(6) == 25) {
+        oS.hh <<= 1; // test abandon older state
+      }
       oS.differsFrom(nS, first: 11, last: 16); // cover !differs path
       if (nS[1] && nS.differsFrom(oS)) nS.set(0); // test state fixing on 1
       if (nS[7] && nS.differsFrom(oS)) nS.setDone(); // test skip notify on 7

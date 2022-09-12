@@ -94,15 +94,19 @@ class Toggler {
     return 0;
   }
 
-  void _ckFix(int i, int nEW, bool isDs) {
+  void _ckFix(int i, int nEW, bool isDs, bool actSet) {
     if (notify == null && fix == null) {
       isDs ? ds = nEW : tg = nEW;
       return;
     }
     final oldS = Toggler(tg: tg, ds: ds, rm: rm, hh: hh);
     if (done) oldS.setDone(); // fix and notify should know
-    final nhh = (((hh.toUnsigned(_b63) >> 18) + 1) << 18) |
-        ((hh.toUnsigned(12) << 6) | i.toUnsigned(6));
+    /// `b7:tg0/ds1 b6:clear0/set1 b5..b0 index`
+    final nhh = (((hh.toUnsigned(_b63) >> 16) + 1) << 16) |
+        ((hh.toUnsigned(8) << 8) |
+            (isDs ? (1 << 7) : 0) |
+            (actSet ? (1 << 6) : 0) |
+            i.toUnsigned(6));
     if (fix != null) {
       final newS =
           Toggler(tg: isDs ? tg : nEW, ds: isDs ? nEW : ds, rm: rm, hh: nhh);
@@ -111,7 +115,7 @@ class Toggler {
           ds |= 1 << _b63;
           error = true;
           assert(hh == oldS.hh,
-              'Data race detected on _ckFix update! [history: ${hh.toUnsigned(18)}]');
+              'Data race detected on _ckFix update! [history: ${hh.toUnsigned(16)}]');
           return;
         }
         tg = newS.tg;
@@ -163,16 +167,19 @@ class Toggler {
   bool get race => ds & 1 << _b63 != 0;
   set race(bool e) => e ? ds |= 1 << _b63 : ds = ds.toUnsigned(_b63);
 
-  /// provides an index of a last singular change coming from the outer code
+  /// a `compact action` CAS byte of the most recent singular change.
+  /// On state copies `recent` value is frozen to the value origin had at copy
+  /// creation time.
   ///
-  /// Note: indice changes made by `fix` are not preserved, `recent` keeps only
-  /// change that started transition.  On state copies `recent` value is frozen
-  /// to the value origin had at copy creation time.
-  int get recent => hh.toUnsigned(6);
+  /// CAS keep _incoming_ changes, not ones made internally by `fix`.
+  /// CAS layout: `(0/1) b7:tg/ds b6:clear/set b5..b0 change index`
+  /// See TogglerRx extension `replay(cas)` method in examples.
+  ///
+  int get recent => hh.toUnsigned(8);
 
   /// monotonic counter of changes. Increased on each `notify` call. In state
   /// copies `serial` is frozen to the value origin had at copy creation time.
-  int get serial => hh.toUnsigned(_b63) >> 18;
+  int get serial => hh.toUnsigned(_b63) >> 16;
 
   /// _true_ if other copy has been created after us. A live Toggler object can
   /// never be older than a copy or other live Toggler.
@@ -180,7 +187,7 @@ class Toggler {
       ? false
       : other.notify != null
           ? true
-          : hh >> 18 < other.hh >> 18;
+          : hh >> 16 < other.hh >> 16;
 
   /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
   bool operator [](int i) => tg & (1 << _v(i)) != 0;
@@ -213,7 +220,7 @@ class Toggler {
       }
     }
     ntg |= 1 << i;
-    if (ntg != tg) _ckFix(i, ntg, false);
+    if (ntg != tg) _ckFix(i, ntg, false, true);
   }
 
   /// clear (to _0_, _off_, _false_ state) item at index `i`.
@@ -223,7 +230,7 @@ class Toggler {
     if (ifActive && !active(i)) return;
     int ntg = tg;
     ntg &= ~(1 << _v(i));
-    if (ntg != tg) _ckFix(i, ntg, false);
+    if (ntg != tg) _ckFix(i, ntg, false, false);
   }
 
   /// sets item state at index `i` to the explicit given value.
@@ -244,7 +251,7 @@ class Toggler {
     if (tg & (1 << _v(i)) != 0) {
       int ntg = tg;
       ntg &= ~(1 << i);
-      if (ntg != tg) _ckFix(i, ntg, false);
+      if (ntg != tg) _ckFix(i, ntg, false, false);
     } else {
       set(i);
     }
@@ -260,7 +267,7 @@ class Toggler {
   void setDS(int i, bool enable) {
     int nds = ds;
     enable ? nds &= ~(1 << _v(i)) : nds |= 1 << _v(i);
-    if (nds != ds) _ckFix(i, nds, true);
+    if (nds != ds) _ckFix(i, nds, true, enable);
   }
 
   /// radioGroup declares a range of items that have "one of" behaviour.
@@ -347,6 +354,24 @@ class Toggler {
       p++;
     }
     return false;
+  }
+
+  /// takes compact state action `sa` and applies it emulating a setter run.
+  /// Used for testing and debugging (eg. with actions saved at end user devices).
+  /// Actions are saved in a single byte per action with bit layout:
+  /// `b7:tg0/ds1 b6:clear0/set1 b5..b0 index`
+  void replay(int sa) {
+    final i = sa.toUnsigned(6);
+    final isDs = sa & 1 << 7 != 0;
+    final actS = sa & 1 << 6 != 0;
+    final va = isDs
+        ? actS
+            ? ds |= (1 << i)
+            : ds &= ~(1 << i)
+        : actS
+            ? tg |= (1 << i)
+            : tg &= ~(1 << i);
+    _ckFix(i, va, isDs, actS);
   }
 }
 
