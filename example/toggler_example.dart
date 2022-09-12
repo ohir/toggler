@@ -78,6 +78,24 @@ extension TogglerRx on Toggler {
 
   /// remove handlers from clone, you may also want to call setDone()
   void freeze() => fix = notify = null;
+
+  /// takes compact state action `sa` and applies it emulating a setter run.
+  /// Used for testing and debugging (eg. with actions saved at end user devices).
+  /// Actions are saved in a single byte per action with bit layout:
+  /// `b7:tg0/ds1 b6:clear0/set1 b5..b0 index`
+  void replay(int cas) {
+    final i = cas.toUnsigned(6);
+    final isDs = cas & 1 << 7 != 0;
+    final actS = cas & 1 << 6 != 0;
+    final va = isDs
+        ? actS
+            ? ds |= (1 << i)
+            : ds &= ~(1 << i)
+        : actS
+            ? tg |= (1 << i)
+            : tg &= ~(1 << i);
+    pump(i, va, isDs, actS);
+  }
 }
 
 /// always use symbolic index

@@ -94,7 +94,11 @@ class Toggler {
     return 0;
   }
 
-  void _ckFix(int i, int nEW, bool isDs, bool actSet) {
+  /// change engine, exposed to allow easy testing and debugging (Apps).
+  /// Do not call this in App code unless you keep to KWYAD principle.
+  /// See TogglerRx extension, `replay(cas)` method in examples for
+  /// legitimate use of pump.
+  void pump(int i, int nEW, bool isDs, bool actSet) {
     if (notify == null && fix == null) {
       isDs ? ds = nEW : tg = nEW;
       return;
@@ -220,7 +224,7 @@ class Toggler {
       }
     }
     ntg |= 1 << i;
-    if (ntg != tg) _ckFix(i, ntg, false, true);
+    if (ntg != tg) pump(i, ntg, false, true);
   }
 
   /// clear (to _0_, _off_, _false_ state) item at index `i`.
@@ -230,7 +234,7 @@ class Toggler {
     if (ifActive && !active(i)) return;
     int ntg = tg;
     ntg &= ~(1 << _v(i));
-    if (ntg != tg) _ckFix(i, ntg, false, false);
+    if (ntg != tg) pump(i, ntg, false, false);
   }
 
   /// sets item state at index `i` to the explicit given value.
@@ -251,7 +255,7 @@ class Toggler {
     if (tg & (1 << _v(i)) != 0) {
       int ntg = tg;
       ntg &= ~(1 << i);
-      if (ntg != tg) _ckFix(i, ntg, false, false);
+      if (ntg != tg) pump(i, ntg, false, false);
     } else {
       set(i);
     }
@@ -267,7 +271,7 @@ class Toggler {
   void setDS(int i, bool enable) {
     int nds = ds;
     enable ? nds &= ~(1 << _v(i)) : nds |= 1 << _v(i);
-    if (nds != ds) _ckFix(i, nds, true, enable);
+    if (nds != ds) pump(i, nds, true, enable);
   }
 
   /// radioGroup declares a range of items that have "one of" behaviour.
@@ -354,24 +358,6 @@ class Toggler {
       p++;
     }
     return false;
-  }
-
-  /// takes compact state action `sa` and applies it emulating a setter run.
-  /// Used for testing and debugging (eg. with actions saved at end user devices).
-  /// Actions are saved in a single byte per action with bit layout:
-  /// `b7:tg0/ds1 b6:clear0/set1 b5..b0 index`
-  void replay(int sa) {
-    final i = sa.toUnsigned(6);
-    final isDs = sa & 1 << 7 != 0;
-    final actS = sa & 1 << 6 != 0;
-    final va = isDs
-        ? actS
-            ? ds |= (1 << i)
-            : ds &= ~(1 << i)
-        : actS
-            ? tg |= (1 << i)
-            : tg &= ~(1 << i);
-    _ckFix(i, va, isDs, actS);
   }
 }
 
