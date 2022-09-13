@@ -15,14 +15,14 @@
 /// Test coverage: 100.0% (133 of 133 lines)
 library toggler;
 
-const _noweb = 0; // 0:web 10:noWeb
-const _b63 = 52 + _noweb; // dart2js int is 53 bit
-const _b62 = 51 + _noweb; //
+const _noweb = 0; // 0:web 10:noWeb // dart2js int is 53 bit
+const _bf = 52 + _noweb; // flag bit
+const _im = 51 + _noweb; // item max bit
 
 /// Last usable bit index. While it could be 62, it is now 51 to enable web use.
 /// If you need no web and need more than 52 flags you may use source package
 /// and update it with `const _noweb = 10;`
-const kTGindexMax = _b62;
+const kTGindexMax = _im;
 
 /// Toggler class keeps state of up to 52 boolean values (items) that can be
 /// manipulated one by one or in concert. _Radio group_ behaviour can be
@@ -81,7 +81,7 @@ class Toggler {
     this.rm = 0,
     this.hh = 0,
   }) {
-    rm = rm.toUnsigned(_b62); // never copy with done
+    rm = rm.toUnsigned(_im); // never copy with done
   }
 
   /// get copy of the state; _done_ flag and handlers are cleared.
@@ -93,8 +93,8 @@ class Toggler {
       Toggler(tg: tg, ds: ds, hh: hh, rm: rm, notify: notify, fix: fix);
 
   int _v(int i) {
-    assert(i < _b63 && i >= 0, 'Toggler index ($i) out of range!');
-    if (i < _b63 && i > 0) return i;
+    assert(i < _bf && i >= 0, 'Toggler index ($i) out of range!');
+    if (i < _bf && i > 0) return i;
     error = true;
     return 0;
   }
@@ -110,7 +110,7 @@ class Toggler {
     }
     final oldS = Toggler(tg: tg, ds: ds, rm: rm, hh: hh);
     if (done) oldS.setDone(); // fix and notify should know
-    final nhh = (((hh.toUnsigned(_b63) >> 16) + 1) << 16) |
+    final nhh = (((hh.toUnsigned(_bf) >> 16) + 1) << 16) |
         ((hh.toUnsigned(8) << 8) |
             (isDs ? (1 << 7) : 0) | //   b7: tg/ds
             (actSet ? (1 << 6) : 0) | // b6: clear/set
@@ -120,7 +120,7 @@ class Toggler {
           Toggler(tg: isDs ? tg : nEW, ds: isDs ? nEW : ds, rm: rm, hh: nhh);
       if (fix!(oldS, newS)) {
         if (hh != oldS.hh) {
-          ds |= 1 << _b63;
+          ds |= 1 << _bf;
           error = true;
           assert(hh == oldS.hh,
               'Data race detected on _ckFix update! [history: ${hh.toUnsigned(16)}]');
@@ -133,11 +133,11 @@ class Toggler {
       }
     } else {
       hh = nhh;
-      rm = rm.toUnsigned(_b62);
+      rm = rm.toUnsigned(_im);
       isDs ? ds = nEW : tg = nEW;
     }
     if (notify != null) {
-      done ? rm = rm.toUnsigned(_b62) : notify!(oldS, this);
+      done ? rm = rm.toUnsigned(_im) : notify!(oldS, this);
     }
   }
 
@@ -152,19 +152,19 @@ class Toggler {
   /// In _reactive_ settings _done_ flag can be set on a state clone to mark it
   /// as "being spent". Note that _done_ flag __always__ comes cleared on all new
   /// copies and clones - whether made of live object or of a state copy.
-  bool get done => rm & 1 << _b63 != 0;
-  set done(bool e) => e ? rm |= 1 << _b63 : rm = rm.toUnsigned(_b62);
+  bool get done => rm & 1 << _bf != 0;
+  set done(bool e) => e ? rm |= 1 << _bf : rm = rm.toUnsigned(_im);
 
   /// sets done, returns true - for `setDone() ? : ` constructs.
-  bool setDone() => (rm |= 1 << _b63) != 0;
+  bool setDone() => (rm |= 1 << _bf) != 0;
 
   /// Error flag is set if index was not in 0..51 range, or data race occured.
   ///
   /// In release code it is prudent to check error sparsely, eg. on leaving
   /// a route (if error happened it means your tests are broken - as in debug builds
   /// an assertion should threw.
-  bool get error => tg & 1 << _b63 != 0;
-  set error(bool e) => e ? tg |= 1 << _b63 : tg = tg.toUnsigned(_b62);
+  bool get error => tg & 1 << _bf != 0;
+  set error(bool e) => e ? tg |= 1 << _bf : tg = tg.toUnsigned(_im);
 
   /// set internally if Toggler live object was modified while `fix`
   /// has been doing changes based on an older state.
@@ -172,8 +172,8 @@ class Toggler {
   /// If such a race occurs, changes based on older state are **not** applied
   /// (are lost).  Races should not happen with fix calling only sync code, but
   /// may happen if fix awaited for something slow.
-  bool get race => ds & 1 << _b63 != 0;
-  set race(bool e) => e ? ds |= 1 << _b63 : ds = ds.toUnsigned(_b62);
+  bool get race => ds & 1 << _bf != 0;
+  set race(bool e) => e ? ds |= 1 << _bf : ds = ds.toUnsigned(_im);
 
   /// _compact action byte_ of the most recent change coming from a state setter.
   ///
@@ -186,7 +186,7 @@ class Toggler {
 
   /// monotonic counter increased on each state change. In _state copies_
   /// `serial` is frozen at value origin had at copy creation time.
-  int get serial => hh.toUnsigned(_b63) >> 16;
+  int get serial => hh.toUnsigned(_bf) >> 16;
 
   /// _true_ if other copy has been created after us. A live Toggler object
   /// (one with a non-null notify) can never be older than a copy or other live
@@ -198,7 +198,7 @@ class Toggler {
       ? false
       : other.notify != null
           ? true
-          : hh.toUnsigned(_b63) >> 16 < other.hh.toUnsigned(_b63) >> 16;
+          : hh.toUnsigned(_bf) >> 16 < other.hh.toUnsigned(_bf) >> 16;
 
   /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
   bool operator [](int i) => tg & (1 << _v(i)) != 0;
@@ -217,7 +217,7 @@ class Toggler {
       // clear all in this radio group
       int k = i;
       int n = 1 << i;
-      while (k < _b63 && rm & n != 0) {
+      while (k < _bf && rm & n != 0) {
         ntg &= ~n;
         n <<= 1;
         k++;
@@ -294,7 +294,7 @@ class Toggler {
   /// A radioGroup creation does not `notify`. Any number of calls to radioGroup
   /// can be replaced by assigning a predefined constant to the `rm` member.
   void radioGroup(int first, int last) {
-    if (first > _b62 || last > _b62 || last < 0 || first < 0 || first >= last) {
+    if (first > _im || last > _im || last < 0 || first < 0 || first >= last) {
       error = true;
       assert(false,
           'Bad radio range. Valid ranges: 0 <= first < last < _b63 | first:$first last:$last');
@@ -326,12 +326,12 @@ class Toggler {
   }
 
   /// _true_ if any item is set, optionally in a given indice range.
-  bool anyInSet({int first = 0, last = _b62}) {
+  bool anyInSet({int first = 0, last = _im}) {
     first = _v(first);
     last = _v(last);
     if (first > last) return false;
     int n = 1 << first;
-    while (first < _b63 && first <= last) {
+    while (first < _bf && first <= last) {
       if (tg & n != 0) return true;
       n <<= 1;
       first++;
@@ -342,8 +342,8 @@ class Toggler {
   /// _true_ if state of `this` and `other` differs, possibly only within a given
   /// range _first..last_ (inclusive).  This can be used to fire ChangeNotifiers
   /// distinct for a provided range within a common to the App Toggler state.
-  bool differsFrom(Toggler other, {int first = 0, int last = _b62}) {
-    if (first > _b62 || last > _b62 || last < 0 || first < 0 || first > last) {
+  bool differsFrom(Toggler other, {int first = 0, int last = _im}) {
+    if (first > _im || last > _im || last < 0 || first < 0 || first > last) {
       assert(
           false, 'Bad range. Valid ranges: 0 <= first <= last < 52web|63aot');
       return false; // do nothing on release
@@ -351,7 +351,7 @@ class Toggler {
     int p = first;
     int n = 1 << first;
     int d = tg ^ other.tg;
-    while (p < _b63 && p <= last) {
+    while (p < _bf && p <= last) {
       if (d & n != 0) return true;
       n <<= 1;
       p++;
@@ -359,7 +359,7 @@ class Toggler {
     p = first;
     n = 1 << first;
     d = ds ^ other.ds;
-    while (p < _b63 && p <= last) {
+    while (p < _bf && p <= last) {
       if (d & n != 0) return true;
       n <<= 1;
       p++;
