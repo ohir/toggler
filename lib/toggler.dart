@@ -84,11 +84,11 @@ class Toggler {
     rm = rm.toUnsigned(_b62); // never copy with done
   }
 
-  /// get copy of the state: _done_ flag and handlers are cleared.
+  /// get copy of the state; _done_ flag and handlers are cleared.
   Toggler state() => Toggler(tg: tg, ds: ds, rm: rm, hh: hh);
 
   /// returns a deep copy of the Toggler, including `notify` and `fix`
-  /// function pointers but with _done_ flag cleared. _There be dragons!_
+  /// function pointers; and _done_ flag cleared.
   Toggler clone() =>
       Toggler(tg: tg, ds: ds, hh: hh, rm: rm, notify: notify, fix: fix);
 
@@ -184,17 +184,21 @@ class Toggler {
   /// index of the most recent change coming from a state setter
   int get recent => hh.toUnsigned(6);
 
-  /// monotonic counter of changes increased on each state change. In state
-  /// copies `serial` is frozen at value origin had at copy creation time.
+  /// monotonic counter increased on each state change. In _state copies_
+  /// `serial` is frozen at value origin had at copy creation time.
   int get serial => hh.toUnsigned(_b63) >> 16;
 
-  /// _true_ if other copy has been created after us. A live Toggler object can
-  /// never be older than a copy or other live Toggler.
+  /// _true_ if other copy has been created after us. A live Toggler object
+  /// (one with a non-null notify) can never be older than a copy or other live
+  /// Toggler.
+  ///
+  /// Note! A concession is made for _reactive_ uses: live state clones with
+  /// only `fix` being non-null compare with each other as copies do.
   bool isOlderThan(Toggler other) => notify != null
       ? false
       : other.notify != null
           ? true
-          : hh >> 16 < other.hh >> 16;
+          : hh.toUnsigned(_b63) >> 16 < other.hh.toUnsigned(_b63) >> 16;
 
   /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
   bool operator [](int i) => tg & (1 << _v(i)) != 0;
