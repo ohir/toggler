@@ -1,3 +1,5 @@
+// Copyright (c) 2022 Wojciech S. Czarnecki, aka Ohir Ripe
+
 import 'package:toggler/toggler.dart';
 
 void main() {

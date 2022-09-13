@@ -1,3 +1,5 @@
+// Copyright (c) 2022 Wojciech S. Czarnecki, aka Ohir Ripe
+
 /// Toggler library can be a part of state management solution. It is designed
 /// for use in singleton aka "ambient" Models but it also may support _reactive_
 /// architectures via its `state` and `clone` copying constructors.
