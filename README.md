@@ -16,7 +16,7 @@ Test coverage: `100.0% (137 of 137 lines)`
  ```Dart
      const flagTurn = 0; // min Toggler item index
      const flagOther = 1; // ...
-     const flagClaim = kTGindexMax; // max Toggler item index (52 or 63)
+     const flagClaim = kTGindexMax; // max Toggler item index (51)
  ```
  4. add a ValueNotifier `final fchg = ValueNotifier<int>(0)` to your Model
  4. add Toggler `final tog = Toggler(notify: (Toggler _, Toggler n) => fchg.value = n.serial);`
@@ -82,6 +82,7 @@ After succesful new state commit `notify` is called. Within this handler you may
   > returns _true_ if any value in _first..last_ range is _set_.
 - `differsFrom(other, {first = 0, last = kTGindexMax})`
   > compares both value and _disabled_ property of _this_ and _other_ item in _first..last_ index range. Returns _true_ if any in range differs.
+- `cm` change mask has bit set to 1 at position(s) of latest change(s)
 
 #### diagnostics:
 - `error`
