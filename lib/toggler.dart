@@ -12,7 +12,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: 100.0% (133 of 133 lines)
+/// Test coverage: 100.0% (137 of 137 lines)
 library toggler;
 
 const _noweb = 0; // 0:web 10:noWeb // dart2js int is 53 bit
@@ -40,6 +40,15 @@ class Toggler {
 
   /// radio-groups 0..51 mask:          1:member of adjacent 1s group
   int rm;
+
+  /// changed at 0..51 mask:            1:just changed at this bit index
+  ///
+  /// change mask allows for a fine-grain control of what logical parts of UI
+  /// Presentation layer should rebuild. At `fix` call _newState.cm_ will have
+  /// only one bit set, for use in `fix` code, then after `fix` _cm_ will be
+  /// updated to reflect **all** changed indice, including ones changed in
+  /// `fix`.
+  int cm;
 
   /// history hash keeps `serial`, `cabyte`, and `recent` values.
   /// Live Toggler updates `hh` on each state change. State copies have `hh`
@@ -79,18 +88,19 @@ class Toggler {
     this.tg = 0,
     this.ds = 0,
     this.rm = 0,
+    this.cm = 0,
     this.hh = 0,
   }) {
     rm = rm.toUnsigned(_im); // never copy with done
   }
 
   /// get copy of the state; _done_ flag and handlers are cleared.
-  Toggler state() => Toggler(tg: tg, ds: ds, rm: rm, hh: hh);
+  Toggler state() => Toggler(tg: tg, ds: ds, rm: rm, cm: cm, hh: hh);
 
   /// returns a deep copy of the Toggler, including `notify` and `fix`
   /// function pointers; and _done_ flag cleared.
   Toggler clone() =>
-      Toggler(tg: tg, ds: ds, hh: hh, rm: rm, notify: notify, fix: fix);
+      Toggler(tg: tg, ds: ds, hh: hh, rm: rm, cm: cm, notify: notify, fix: fix);
 
   int _v(int i) {
     assert(i < _bf && i >= 0, 'Toggler index ($i) out of range!');
@@ -105,6 +115,7 @@ class Toggler {
   /// extension
   void pump(int i, int nEW, bool isDs, bool actSet) {
     if (notify == null && fix == null) {
+      cm = isDs ? ds ^ nEW : tg ^ nEW;
       isDs ? ds = nEW : tg = nEW;
       return;
     }
@@ -118,6 +129,7 @@ class Toggler {
     if (fix != null) {
       final newS =
           Toggler(tg: isDs ? tg : nEW, ds: isDs ? nEW : ds, rm: rm, hh: nhh);
+      newS.cm = isDs ? ds ^ nEW : tg ^ nEW; // pass coming single change mask
       if (fix!(oldS, newS)) {
         if (hh != oldS.hh) {
           ds |= 1 << _bf;
@@ -130,10 +142,12 @@ class Toggler {
         ds = newS.ds;
         hh = newS.hh;
         rm = newS.rm; // may come 'done'
+        cm = (tg ^ oldS.tg) | (ds ^ oldS.ds); // change mask of fixed
       }
     } else {
       hh = nhh;
       rm = rm.toUnsigned(_im);
+      cm = isDs ? ds ^ nEW : tg ^ nEW;
       isDs ? ds = nEW : tg = nEW;
     }
     if (notify != null) {

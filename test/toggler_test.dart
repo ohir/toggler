@@ -9,7 +9,8 @@ void main() {
     final flags = Toggler();
 
     setUp(() {
-      flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
+      flags.tg = flags.ds = flags.rm = flags.hh = flags.cm = 0; // reset
+      flags.fix = flags.notify = null;
     });
 
     test('Set 0 Max', () {
@@ -131,6 +132,27 @@ void main() {
               c2.hh == c0.hh &&
               c2.hh == 0,
           isTrue);
+    });
+    test('Change mask A', () {
+      flags.set(0);
+      expect(flags.cm == 1, isTrue);
+      flags.set(10);
+      expect(flags.cm == 1024, isTrue);
+      flags.set(11);
+      flags.set(33);
+      flags.disable(51); // cm must reflect any change at index
+      expect(flags.cm == 1 << 51, isTrue);
+    });
+    test('Change mask B', () {
+      bool cf(Toggler o, Toggler n) {
+        n.set(1);
+        n.disable(2);
+        return true;
+      }
+
+      flags.fix = cf;
+      flags.set(0);
+      expect(flags.cm == 7, isTrue); // b0,b1,b2 changed
     });
     test('Differs', () {
       var c1 = flags.state();

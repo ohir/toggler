@@ -6,7 +6,7 @@
 
 Toggler is a single class library with no dependencies.
 
-Test coverage: `100.0% (133 of 133 lines)`
+Test coverage: `100.0% (137 of 137 lines)`
 
 ## Getting started
 
