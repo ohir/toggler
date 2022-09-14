@@ -12,7 +12,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: 100.0% (137 of 137 lines)
+/// Test coverage: 100.0% (138 of 138 lines)
 library toggler;
 
 const _noweb = 0; // 0:web 10:noWeb // dart2js int is 53 bit
@@ -216,6 +216,7 @@ class Toggler {
 
   /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
   bool operator [](int i) => tg & (1 << _v(i)) != 0;
+  void operator []=(int i, bool v) => setTo(i, v);
 
   /// _true_ if Toggler item at index `i` is enabled
   bool active(int i) => ds & (1 << _v(i)) == 0;

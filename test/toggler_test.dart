@@ -14,7 +14,7 @@ void main() {
     });
 
     test('Set 0 Max', () {
-      flags.set(0);
+      flags[0] = true; // cover []= setter
       flags.set(kTGindexMax);
       expect(
           flags[0] &&
