@@ -55,7 +55,7 @@ After succesful new state commit `notify` is called. Within this handler you may
 ### API 101
 
 #### constructors:
-- `Toggler({fix: onChange, notify: afterChange, tg: 0, ds: 0, rm: 0, hh: 0})`
+- `Toggler({fix: onChange, notify: afterChange, tg: 0, ds: 0, rm: 0, cm: 0, hh: 0})`
   > at least `notify` is needed to make a _live_ Toggler. All other members can be given to default constructor, too - used eg. in saved state deserializer and tests. An all-default Toggler can be mutated at will, eg. in an explicit App state initializer, then `notify` and/or `fix` handlers can be attached later.
 - `state()` method returns a _copy of state_ only (ie. with `fix` = `notify` = null).
 - `clone()` method returns a deep copy of `this`. _Caveat emptor!_
