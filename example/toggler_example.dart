@@ -78,13 +78,18 @@ extension TogglerRx on Toggler {
     return true;
   }
 
-  /// remove handlers from clone, you may also want to call setDone()
+  /// unconditionally remove handlers from cloned object
   void freeze() => fix = notify = null;
 
-  /// takes compact state action `sa` and applies it emulating a setter run.
+  /// _compact action byte_ of the most recent change coming from a state setter.
+  /// For use with `replay` method below.
+  ///
+  /// CAbyte keeps _incoming_ changes, not ones made internally by `fix`.
+  /// CAbyte layout: `(0/1) b7:tg/ds b6:clear/set b5..b0 change index`
+  int get cabyte => hh.toUnsigned(8);
+
+  /// takes compact action byte and applies it - emulating a setter run.
   /// Used for testing and debugging (eg. with actions saved at end user devices).
-  /// Actions are saved in a single byte per action with bit layout:
-  /// `b7:tg0/ds1 b6:clear0/set1 b5..b0 index`
   void replay(int cas) {
     final i = cas.toUnsigned(6);
     final isDs = cas & 1 << 7 != 0;

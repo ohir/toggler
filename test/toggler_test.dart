@@ -113,7 +113,6 @@ void main() {
       expect(c0.hh == c1.hh, isTrue); // copies may not alter history
       expect(c0.serial == c1.serial, isTrue);
       expect(c0.recent == c1.recent, isTrue);
-      expect(c0.recent == c1.cabyte.toUnsigned(6), isTrue);
     });
     test('copy may not mutate history', () {
       var c0 = Toggler();

@@ -12,7 +12,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: 100.0% (138 of 138 lines)
+/// Test coverage: 100.0% (137 of 137 lines)
 library toggler;
 
 const _noweb = 0; // 0:web 10:noWeb // dart2js int is 53 bit
@@ -121,11 +121,11 @@ class Toggler {
     }
     final oldS = Toggler(tg: tg, ds: ds, rm: rm, hh: hh);
     if (done) oldS.setDone(); // fix and notify should know
-    final nhh = (((hh.toUnsigned(_bf) >> 16) + 1) << 16) |
-        ((hh.toUnsigned(8) << 8) |
-            (isDs ? (1 << 7) : 0) | //   b7: tg/ds
-            (actSet ? (1 << 6) : 0) | // b6: clear/set
-            i.toUnsigned(6)); //     b5..b0: item index
+    final nhh = (((hh.toUnsigned(_bf) >> 16) + 1) << 16) | // serial++
+        ((hh.toUnsigned(8) & ~0xff) | // b15..b8: internal use
+            (isDs ? (1 << 7) : 0) | // cabyte b7: tg/ds
+            (actSet ? (1 << 6) : 0) | //      b6: clear/set
+            i.toUnsigned(6)); //          b5..b0: item index
     if (fix != null) {
       final newS =
           Toggler(tg: isDs ? tg : nEW, ds: isDs ? nEW : ds, rm: rm, hh: nhh);
@@ -189,12 +189,6 @@ class Toggler {
   bool get race => ds & 1 << _bf != 0;
   set race(bool e) => e ? ds |= 1 << _bf : ds = ds.toUnsigned(_im);
 
-  /// _compact action byte_ of the most recent change coming from a state setter.
-  ///
-  /// CAbyte keep _incoming_ changes, not ones made internally by `fix`.
-  /// CAbyte layout: `(0/1) b7:tg/ds b6:clear/set b5..b0 change index`
-  int get cabyte => hh.toUnsigned(8);
-
   /// index of the most recent change coming from a state setter
   int get recent => hh.toUnsigned(6);
 
@@ -216,6 +210,8 @@ class Toggler {
 
   /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
   bool operator [](int i) => tg & (1 << _v(i)) != 0;
+
+  /// unconditionally set item value
   void operator []=(int i, bool v) => setTo(i, v);
 
   /// _true_ if Toggler item at index `i` is enabled
