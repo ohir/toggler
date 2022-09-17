@@ -63,6 +63,11 @@ void main() {
   flags.set(kTGnameD);
 }
 
+/// toMask int extensiom takes index and returns const in with 1 set at index
+extension TogglerMask on int {
+  toMask(int i) => i >= 0 && i <= tgIndexMax ? 1 << i : 0;
+}
+
 /// for use in Rx settings state methods can be added as an extension
 extension TogglerRx on Toggler {
   /// apply externally mutated state to the _Model_ object.
@@ -72,7 +77,7 @@ extension TogglerRx on Toggler {
     if (doNotify && notify != null) oldS = state();
     tg = src.tg;
     ds = src.ds;
-    rm = src.rm;
+    rg = src.rg;
     hh = src.hh;
     if (doNotify && notify != null) notify!(oldS!, this);
     return true;

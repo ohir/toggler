@@ -6,7 +6,7 @@
 
 Toggler is a single class library with no dependencies.
 
-Test coverage: `100.0% (137 of 137 lines)`
+Test coverage: `100.0% (145 of 145 lines)`
 
 ## Getting started
 
@@ -14,9 +14,9 @@ Test coverage: `100.0% (137 of 137 lines)`
  1. import toggler for your Model: `import 'package:toggler/toggler.dart';`
  2. declare meaningful names for your knobs:
  ```Dart
-     const flagTurn = 0; // min Toggler item index
-     const flagOther = 1; // ...
-     const flagClaim = kTGindexMax; // max Toggler item index (51)
+     const tgTurn = 0; // min Toggler item index
+     const tgOther = 1; // ...
+     const tgClaim = tgIndexMax; // max Toggler item index (51)
  ```
  4. add a ValueNotifier `final fchg = ValueNotifier<int>(0)` to your Model
  4. add Toggler `final tog = Toggler(notify: (Toggler _, Toggler n) => fchg.value = n.serial);`
@@ -28,12 +28,12 @@ Test coverage: `100.0% (137 of 137 lines)`
     final tog = getX((Model m) => m.tog);
     watchX((Model m) => m.fchg);
     // ...
-    return tog[flagTurn] // somewhere in build
+    return tog[tgTurn] // somewhere in build
       ? const IconYou(...)
       : const IconOpponent(...),
             // ... ClaimPrize is shown disabled unless active
-            onPressed: tog.active(flagClaim)
-              ? () => tog.toggle(flagClaim)
+            onPressed: tog.active(tgClaim)
+              ? () => tog.toggle(tgClaim)
               : null,
 ```
 
@@ -78,10 +78,12 @@ After succesful new state commit `notify` is called. Within this handler you may
 - `serial` is a monotonic state serial number (34b), bigger is newer
 - `isOlderThan(other)` compares serial numbers of state copies.
   > Any _live_ object always is newer than any other Toggler object.
-- `anyInSet({first = 0, last = kTGindexMax})`
-  > returns _true_ if any value in _first..last_ range is _set_.
-- `differsFrom(other, {first = 0, last = kTGindexMax})`
-  > compares both value and _disabled_ property of _this_ and _other_ item in _first..last_ index range. Returns _true_ if any in range differs.
+- `changed(i, relmask)`
+  > returns _true_ if there was a recent change at _i_ or _relmask_ matching positions
+- `anyInSet({first, last, relmask})`
+  > returns _true_ if any value in _first..last_ range, or on _relmask_ matching positions is _set_.
+- `differsFrom(other, {first, last, relmask})`
+  > compares both value and _disabled_ property of _this_ and _other_ item, returns _true_ if any bit differs. Check can be limited to _first..last_ index range, or to _relmask_ matching positions.
 - `cm` change mask has bit set to 1 at position(s) of latest change(s)
 
 #### diagnostics:

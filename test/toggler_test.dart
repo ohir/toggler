@@ -9,22 +9,19 @@ void main() {
     final flags = Toggler();
 
     setUp(() {
-      flags.tg = flags.ds = flags.rm = flags.hh = flags.cm = 0; // reset
+      flags.tg = flags.ds = flags.rg = flags.hh = flags.chb = 0; // reset
       flags.fix = flags.notify = null;
     });
 
     test('Set 0 Max', () {
       flags[0] = true; // cover []= setter
-      flags.set(kTGindexMax);
+      flags.set(tgIndexMax);
       expect(
-          flags[0] &&
-              !flags[1] &&
-              !flags[kTGindexMax - 1] &&
-              flags[kTGindexMax],
+          flags[0] && !flags[1] && !flags[tgIndexMax - 1] && flags[tgIndexMax],
           isTrue);
       flags.clear(0);
-      flags.clear(kTGindexMax);
-      expect(!flags[0] && !flags[kTGindexMax], isTrue);
+      flags.clear(tgIndexMax);
+      expect(!flags[0] && !flags[tgIndexMax], isTrue);
     });
     test('Is Set in range set boundry', () {
       flags.set(7);
@@ -46,24 +43,33 @@ void main() {
       flags.set(0, ifActive: true);
       expect(flags[0], isTrue);
     });
+    test('setDisable setEnable', () {
+      flags.setDS(0, true);
+      expect(flags.active(0), isFalse);
+      flags.set(0, ifActive: true);
+      expect(flags[0], isFalse);
+      flags.setDS(0, false);
+      flags.set(0, ifActive: true);
+      expect(flags[0], isTrue);
+    });
     test('Disable Max', () {
-      flags.set(kTGindexMax);
-      flags.disable(kTGindexMax);
-      flags.clear(kTGindexMax, ifActive: true);
-      flags.setTo(kTGindexMax, false, ifActive: true);
-      expect(flags[kTGindexMax], isTrue);
-      flags.setTo(kTGindexMax, false);
-      expect(flags[kTGindexMax], isFalse);
+      flags.set(tgIndexMax);
+      flags.disable(tgIndexMax);
+      flags.clear(tgIndexMax, ifActive: true);
+      flags.setTo(tgIndexMax, false, ifActive: true);
+      expect(flags[tgIndexMax], isTrue);
+      flags.setTo(tgIndexMax, false);
+      expect(flags[tgIndexMax], isFalse);
     });
     test('DisableEnable Max-1', () {
-      flags.disable(kTGindexMax - 1);
-      flags.set(kTGindexMax - 1, ifActive: true);
-      expect(flags[kTGindexMax - 1], isFalse);
-      flags.setTo(kTGindexMax - 1, true, ifActive: true);
-      expect(flags[kTGindexMax - 1], isFalse);
-      flags.enable(kTGindexMax - 1);
-      flags.set(kTGindexMax - 1, ifActive: true);
-      expect(flags[kTGindexMax - 1], isTrue);
+      flags.disable(tgIndexMax - 1);
+      flags.set(tgIndexMax - 1, ifActive: true);
+      expect(flags[tgIndexMax - 1], isFalse);
+      flags.setTo(tgIndexMax - 1, true, ifActive: true);
+      expect(flags[tgIndexMax - 1], isFalse);
+      flags.enable(tgIndexMax - 1);
+      flags.set(tgIndexMax - 1, ifActive: true);
+      expect(flags[tgIndexMax - 1], isTrue);
     });
     test('DisableEnable 33', () {
       flags.set(33, ifActive: true);
@@ -134,13 +140,18 @@ void main() {
     });
     test('Change mask A', () {
       flags.set(0);
-      expect(flags.cm == 1, isTrue);
+      expect(flags.chb == 1, isTrue);
       flags.set(10);
-      expect(flags.cm == 1024, isTrue);
+      expect(flags.chb == 1024, isTrue);
+      expect(flags.changed(i: 10), isTrue);
+      expect(flags.changed(i: 10, relmask: 7 << 8), isTrue);
+      expect(flags.changed(i: 11, relmask: 7 << 8), isFalse);
+      expect(flags.changed(i: 10, relmask: 7 << 7), isFalse);
+      expect(flags.changed(relmask: 7 << 8), isTrue);
       flags.set(11);
       flags.set(33);
       flags.disable(51); // cm must reflect any change at index
-      expect(flags.cm == 1 << 51, isTrue);
+      expect(flags.chb == 1 << 51, isTrue);
     });
     test('Change mask B', () {
       bool cf(Toggler o, Toggler n) {
@@ -151,13 +162,15 @@ void main() {
 
       flags.fix = cf;
       flags.set(0);
-      expect(flags.cm == 7, isTrue); // b0,b1,b2 changed
+      expect(flags.chb == 7, isTrue); // b0,b1,b2 changed
     });
     test('Differs', () {
       var c1 = flags.state();
       expect(c1.differsFrom(flags), isFalse);
       c1.set(5);
       expect(c1.differsFrom(flags), isTrue);
+      expect(c1.differsFrom(flags, relmask: 63), isTrue);
+      expect(c1.differsFrom(flags, relmask: 31), isFalse);
       flags.set(5);
       expect(c1.differsFrom(flags), isFalse);
       flags.set(8);
@@ -181,7 +194,7 @@ void main() {
     final flags = Toggler();
 
     setUp(() {
-      flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
+      flags.tg = flags.ds = flags.rg = flags.hh = 0; // reset
       flags.radioGroup(kA, kC);
       flags.radioGroup(kE, kH);
       flags.set(kA);
@@ -198,7 +211,7 @@ void main() {
       }, throwsAssertionError);
     });
     test('Set 0..3 radio', () {
-      flags.rm = 0; // reset radios
+      flags.rg = 0; // reset radios
       flags.radioGroup(k0, kC);
       flags.set(k0);
       expect(flags[k0], isTrue);
@@ -211,7 +224,7 @@ void main() {
     });
     test('Set 60..63 radio | should throw', () {
       expect(() {
-        flags.rm = 0; // reset radios
+        flags.rg = 0; // reset radios
         flags.radioGroup(60, 63);
       }, throwsAssertionError);
     });
@@ -238,7 +251,7 @@ void main() {
     final flags = Toggler();
 
     setUp(() {
-      flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
+      flags.tg = flags.ds = flags.rg = flags.hh = 0; // reset
     });
     test('Race/Err/Done set true', () {
       flags.error = true;
@@ -281,7 +294,7 @@ void main() {
     final flags = Toggler();
     const ohh = 7777777777;
     setUp(() {
-      flags.tg = flags.ds = flags.rm = 0;
+      flags.tg = flags.ds = flags.rg = 0;
       flags.hh = ohh;
       flags.fix = chfix;
       flags.notify = chnote;
@@ -380,7 +393,7 @@ void main() {
     final flags = Toggler(notify: chnote, fix: chfix);
 
     setUp(() {
-      flags.tg = flags.ds = flags.rm = flags.hh = 0; // reset
+      flags.tg = flags.ds = flags.rg = flags.hh = 0; // reset
     });
     test('Notify 0', () {
       flags.set(0);
