@@ -8,11 +8,12 @@
 ///
 /// Toggler supports pre-commit state validation and mutation. After any single
 /// change it first fires `fix` state transition handler, then commits new state
-/// `fix` prepared, then calls `notify` to inform outer world of changes made.
+/// `fix` prepared, then calls `notify` (or signals `notifier`) to inform outer
+/// world of changes made.
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: 100.0% (145 of 145 lines)
+/// Test coverage: 100.0% (154 of 154 lines)
 library toggler;
 
 const _noweb = 0; // 0:web 10:noWeb // dart2js int is 53 bit
@@ -65,6 +66,13 @@ class Toggler {
   /// is called after state change has been _commited_.
   TogglerChangeNotify? notify;
 
+  /// Concrete implementation of ToggleNotifier class. If given, it will be
+  /// _pumped_ with _chb_ after any change if _fix_ will return _true_ and new
+  /// state is not _done_. If both _notifier_ object and _notify_ handler are
+  /// given, _notifier_ is **not** run automatically: if needed, you should
+  /// _pump_ it from within your _notify_ handler yourself.
+  ToggledNotifier? notifier;
+
   /// handler `bool fix(Toggler oldState, Toggler newState)`
   /// manages state transitions. Eg. enabling or disabling items if some
   /// condition is met.  If `fix` is null every single state change from a
@@ -85,10 +93,11 @@ class Toggler {
   TogglerValidateFix? fix;
 
   /// All Toggler members are public for easy tests and custom serialization.
-  /// Toggler object with state transition handlers (`fix`, `notify`) is
-  /// said to be a _live_ one. Otherwise, if handlers are null, it is a _state
-  /// copy_ object.
+  /// Toggler object with state transition handler (`fix`), or notifiers
+  /// (`notify` or `notifier`) is said to be a _live_ one. Otherwise, if all
+  /// handlers are null, it is a _state copy_ object.
   Toggler({
+    this.notifier,
     this.notify,
     this.fix,
     this.tg = 0,
@@ -188,10 +197,17 @@ class Toggler {
     if (ntg != tg) pump(i, ntg, false, false);
   }
 
-  /// returns a deep copy of the Toggler, including `notify` and `fix`
-  /// function pointers; _done_ flag is cleared always.
+  /// returns a deep copy of the Toggler, including `notify`, `notifier`, and
+  /// `fix` references; _done_ flag is cleared always.
   Toggler clone() => Toggler(
-      tg: tg, ds: ds, hh: hh, rg: rg, chb: chb, notify: notify, fix: fix);
+      notifier: notifier,
+      notify: notify,
+      fix: fix,
+      tg: tg,
+      ds: ds,
+      rg: rg,
+      chb: chb,
+      hh: hh);
 
   /// _true_ if state of `this` and `other` differs. Optionally just at positions
   /// provided with _relmask_ (1), or within a given _first..last__ indice
@@ -253,7 +269,7 @@ class Toggler {
   /// really really KWYAD.  For legitimate use of pump see `replay(cas)` method
   /// in example TogglerRx extension.
   void pump(int i, int nEW, bool isDs, bool actSet) {
-    if (notify == null && fix == null) {
+    if (notify == null && notifier == null && fix == null) {
       chb = isDs ? ds ^ nEW : tg ^ nEW;
       isDs ? ds = nEW : tg = nEW;
       return;
@@ -291,6 +307,8 @@ class Toggler {
     }
     if (notify != null) {
       done ? rg = rg.toUnsigned(_im) : notify!(oldS, this);
+    } else if (notifier != null) {
+      done ? rg = rg.toUnsigned(_im) : notifier!.pump(chb);
     }
   }
 
@@ -418,3 +436,34 @@ typedef TogglerValidateFix = bool Function(Toggler oldState, Toggler newState);
 
 /// `notify` function signature
 typedef TogglerChangeNotify = void Function(Toggler oldState, Toggler current);
+
+// coverage:ignore-start
+/// Toggler's change notification dispatcher, an abstract interface.
+/// _Note: example code below uses `WatchX` of `get_it_mixin` package:
+/// neither `WatchX` is a part of Toggler, nor Toggler depends on get_it_mixin._
+/// See Flutter example for concrete implementation of ToggledNotifier (the
+/// _UiNotifier_ class).
+abstract class ToggledNotifier {
+  // @mustBeOverridden
+  /// the _chb_ recent changes bitmask is to be pumped here.
+  /// Automatically, if an implementation is provided to Toggler _notifier_.
+  void pump(int chb) => throw UnimplementedError('pump not implemented');
+
+  // @mustBeOverridden
+  /// used to get _masked_ notifiers,
+  /// eg. `watchX((ToggledNotifier x) => x(tmDn | tmUp));`
+  dynamic call(int relmask) => throw UnimplementedError('call not implemented');
+
+  // @mustBeOverridden
+  /// used to get _indexed_ notifiers
+  /// eg. `watchX((ToggledNotifier x) => x[tgSendAction]);`
+  dynamic operator [](int index) =>
+      throw UnimplementedError('operator [] not implemented');
+
+  /// set _indexed_ notifiers, use only in test pipelines
+  bool addIndexed(int index, dynamic value) => false;
+
+  /// add _masked_ notifier, use only in test pipelines
+  bool addMasked(int relmask, dynamic value) => false;
+}
+// coverage:ignore-end

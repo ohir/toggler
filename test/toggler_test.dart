@@ -4,6 +4,13 @@ import 'package:toggler/toggler.dart';
 import 'package:test/test.dart';
 
 final Matcher throwsAssertionError = throwsA(isA<AssertionError>());
+
+class TCNo extends ToggledNotifier {
+  int seen = 0;
+  @override
+  void pump(int chb) => seen = chb;
+}
+
 void main() {
   group('Rudimentary :: ', () {
     final flags = Toggler();
@@ -341,6 +348,13 @@ void main() {
       expect(flags[5] && flags.hh != ohh, isTrue);
       expect(ntlast, equals(1));
     });
+    test('history changes with just notifier', () {
+      flags.fix = null;
+      flags.notify = null;
+      flags.notifier = TCNo();
+      flags.toggle(5);
+      expect(flags[5] && flags.hh != ohh, isTrue);
+    });
     test('done is cleared on fix only', () {
       flags.notify = null;
       expect(flags.done, isFalse);
@@ -370,6 +384,38 @@ void main() {
       expect(!flags[5] && flags.hh != ohh, isTrue);
       expect(ntlast, equals(2));
       expect(filast, equals(0));
+    });
+    test('done is cleared on notifier only', () {
+      flags.fix = null;
+      flags.notify = null;
+      flags.notifier = TCNo();
+      expect(flags.done, isFalse);
+      flags.setDone();
+      expect(flags.done, isTrue);
+      flags.toggle(5);
+      expect(flags.done, isFalse);
+      flags.done = true;
+      expect(flags.done, isTrue);
+      flags.toggle(5);
+      expect(flags.done, isFalse);
+      expect(!flags[5] && flags.hh != ohh, isTrue);
+    });
+    test('notifier should fire alone', () {
+      var noo = TCNo();
+      flags.fix = null;
+      flags.notify = null;
+      flags.notifier = noo;
+      flags.toggle(5);
+      expect(flags.chb == noo.seen, isTrue);
+      expect(noo.seen, equals(1 << 5));
+    });
+    test('notifier may not fire if notify handler is present', () {
+      var noo = TCNo();
+      flags.fix = null;
+      flags.notifier = noo;
+      flags.toggle(5);
+      expect(flags.chb == noo.seen, isFalse);
+      expect(noo.seen, equals(0));
     });
     /*
     */

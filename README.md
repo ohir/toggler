@@ -4,9 +4,9 @@
 
 **Toggler** was designed specifically for singleton _Models_ and for _observer_ style state flows, though it can also be used in _reactive_ state management architectures via its `state` and `clone` copying constructors.  For safe use within a singleton _Model_ Toggler has built-in data race detection and automatically skips changes coming from an outdated ancestor state.
 
-Toggler is a single class library with no dependencies.
+Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (145 of 145 lines)`
+Test coverage: `100.0% (154 of 154 lines)`
 
 ## Getting started
 
@@ -48,9 +48,27 @@ If `fix` handler has not been provided, any single item change made by setter is
 
 Your code in `fix` may manipulate _newState_ at will, it even may assign a some predefined const values to the `tg` and/or `ds` properties of it. Usually `fix` is Model's internal function, so it may have access to all other pieces of your business logic.
 
-After succesful new state commit `notify` is called. Within this handler you may selectively check where changes were made, eg using `recent` index, or `differsFrom(oldState, rangeFirst, rangeLast)` helper. Then you may run your chosen state passing machinery (Eg. update InheritedWidget state, feed an EventObserver, push a cloned object to the Stream...).
-> Toggler author's preffered mechanics: copy `serial` of a new state to the [ValueNotifier](https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html).value that is observed in the **stateless** widgets tree using [get_it_mixin](https://pub.dev/packages/get_it_mixin)).
+After succesful new state commit `notify` is called. Within this handler you may selectively check where changes were made, eg using `recent` index, or `differsFrom(oldState, rangeFirst, rangeLast)` helper. Then you may run your chosen state passing machinery (Eg. update InheritedWidget state, feed an EventObserver, push a cloned object to the Stream),
+or better use a suitable ToggledNotifier.
 
+For a most seamless integration with View layer, an implementation of `ToggledNotifier` can be given instead of `notify` handler function. If `ToggledNotifier` is used together with [get_it_mixin](https://pub.dev/packages/get_it_mixin), Toggler state and UI can be bound in any place within _StatelessWidgets_ tree and have containing Widget be automatically updated on relevant changes. Just by two lines of code:
+```Dart
+const tgUp = 4; const tmUp = 1 << tgUp; // item index 4, changed mask 16
+const tgDn = 5; const tmDn = 1 << tgDn; // item index 5, changed mask 32
+// ... somewhere in stateless build:
+  Widget build(BuildContext context) {
+    final m = get<ViewModel>(); //        good to have whole Model at hand
+    watchX((ToggledNotifier x) => x(tmDn | tmUp)); //  rebuild on either
+        // two above lines are all you need to bind View and Model
+        // ...
+        Text('${m.counter}'),
+        IconButton(onPressed: m.sub, icon: const Icon(Icons.remove_circle)),
+        IconButton(onPressed: m.add, icon: const Icon(Icons.add_circle)),
+        // m.add() increments counter then toggles tgUp flag, then a
+        // ToggledNotifier signals change to any widget watching on tmUp
+        // signal. For the m.sub counter is decremented then tgDn toggled
+```
+_See Flutter example for the whole..._
 
 ### API 101
 
@@ -83,8 +101,8 @@ After succesful new state commit `notify` is called. Within this handler you may
 - `anyInSet({first, last, relmask})`
   > returns _true_ if any value in _first..last_ range, or on _relmask_ matching positions is _set_.
 - `differsFrom(other, {first, last, relmask})`
-  > compares both value and _disabled_ property of _this_ and _other_ item, returns _true_ if any bit differs. Check can be limited to _first..last_ index range, or to _relmask_ matching positions.
-- `cm` change mask has bit set to 1 at position(s) of latest change(s)
+  > compares both value and _disabled_ property of _this_ and _other_ item, returns _true_ if any bit position differs. Check can be limited to _first..last_ index range, or to _relmask_ matching positions.
+- `chb` changed bitmask has bit(s) set to 1 at position(s) of latest change(s)
 
 #### diagnostics:
 - `error`
@@ -102,4 +120,4 @@ After succesful new state commit `notify` is called. Within this handler you may
 - Toggler intentionally has no `toString` nor `toJSON` methods. Its whole state is public and consist of just four _ints_. It should be handled seamlesslly by any serialization method one may have chosen for a whole _Model_.
 
 #### state serial overflow:
-- Serial counter will overflow once per 16 billion changes. It is 500 years of once per second user taps, 9 years of per-frame toggles @60fps, or 6 months of counting every network frame @12Mbps. If overflow happens, the `isOlderThan` method may lie comparing state copies made before and after overflow. (_IOW: it may concern you if you use _reactive_ style state management __and__ use serial as identity-age sentinel __and__ your code is meant to work 24/365. Then you may consider resetting `hh` to 0 at suitable moments eg. when your input queque empties_).
+- Serial counter will overflow once per 16 billion changes. It is 500 years of once per second user taps, 9 years of per-frame toggles @60fps, or 6 months of counting every network frame @12Mbps. If overflow happens, the `isOlderThan` method may lie comparing state copies made before and after overflow. (_IOW: it may concern you if you use _reactive_ style state management __and__ use serial as identity-age sentinel __and__ your code is meant to work 24/365. Then you may consider resetting `hh` to 0 at suitable moments eg. when your event queque empties_).
