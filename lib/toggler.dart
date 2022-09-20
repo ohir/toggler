@@ -277,7 +277,7 @@ class Toggler {
     final oldS = Toggler(tg: tg, ds: ds, rg: rg, hh: hh);
     if (done) oldS.setDone(); // fix and after should know
     final nhh = (((hh.toUnsigned(_bf) >> 16) + 1) << 16) | // serial++
-        (hh.toUnsigned(8) | //  b15..b13 reserved, b12..b8: brand
+        ((hh & ~0xff) | //  b15..b13 reserved, b12..b8: brand
             (isDs ? (1 << 7) : 0) | // cabyte b7: tg/ds
             (actSet ? (1 << 6) : 0) | //      b6: clear/set
             i.toUnsigned(6)); //          b5..b0: item index
