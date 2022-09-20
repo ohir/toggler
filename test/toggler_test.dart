@@ -288,7 +288,6 @@ void main() {
     });
   });
   group('Done and history :: ', () {
-    // ensure
     int ntlast = 0;
     int filast = 0;
     void chnote(Toggler oS, Toggler nS) => ntlast++;
@@ -416,6 +415,13 @@ void main() {
       flags.toggle(5);
       expect(flags.chb == noo.seen, isFalse);
       expect(noo.seen, equals(0));
+    });
+    test('brand may not change with history', () {
+      flags.hh = 0xff << 8;
+      flags.toggle(49);
+      flags.toggle(50);
+      flags.toggle(51);
+      expect(flags.hh >> 8 == 0x3ff, isTrue);
     });
     /*
     */
