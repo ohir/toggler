@@ -8,12 +8,12 @@
 ///
 /// Toggler supports pre-commit state validation and mutation. After any single
 /// change it first fires `fix` state transition handler, then commits new state
-/// `fix` prepared, then calls `notify` (or signals `notifier`) to inform outer
+/// `fix` prepared, then calls `after` (or signals `notifier`) to inform outer
 /// world of changes made.
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: 100.0% (154 of 154 lines)
+/// Test coverage: **100.0%** (154 of 154 lines)
 library toggler;
 
 const _noweb = 0; // 0:web 10:noWeb // dart2js int is 53 bit
@@ -54,23 +54,23 @@ class Toggler {
   /// access _chb_ in a readable way.
   int chb;
 
-  /// history hash keeps `serial`, `cabyte`, and `recent` values.
-  /// Live Toggler updates `hh` on each state change. State copies have `hh`
-  /// frozen at values origin had at copy creation time.
+  /// history hash keeps `serial` and `recent` values.  Live Toggler updates
+  /// `hh` on each state change. State copies have `hh` frozen at values origin
+  /// had at copy creation time.
   ///
-  /// Note: Whether `hh` should be serialized and restored depends on App's state
-  /// management architecture used.
+  /// Note: Whether `hh` should be serialized and restored depends on App's
+  /// state management architecture used.
   int hh;
 
-  /// handler `void notify(Toggler oldState, Toggler current)`
+  /// handler `void after(Toggler oldState, Toggler current)`
   /// is called after state change has been _commited_.
-  TogglerChangeNotify? notify;
+  TogglerAfterChange? after;
 
   /// Concrete implementation of ToggleNotifier class. If given, it will be
   /// _pumped_ with _chb_ after any change if _fix_ will return _true_ and new
-  /// state is not _done_. If both _notifier_ object and _notify_ handler are
+  /// state is not _done_. If both _notifier_ object and _after_ handler are
   /// given, _notifier_ is **not** run automatically: if needed, you should
-  /// _pump_ it from within your _notify_ handler yourself.
+  /// _pump_ it from within your _after_ handler yourself.
   ToggledNotifier? notifier;
 
   /// handler `bool fix(Toggler oldState, Toggler newState)`
@@ -79,26 +79,26 @@ class Toggler {
   /// setter is commited immediately.
   ///
   /// On _true_ return, _newState_ will be commited, ie. copied to the live
-  /// Toggler object in a single run.  Then `notify` part will run, if present
+  /// Toggler object in a single run.  Then `after` part will run, if present
   /// and unless supressed.
   ///
-  /// A `fix` code may suppress subsequent `notify` call by setting _done_ flag
+  /// A `fix` code may suppress subsequent `after` call by setting _done_ flag
   /// on a _newState_. This internal _done_ state is not copied to the live
   /// Toggler on commit.
   ///
   /// In simpler Apps `fix` state handler is the only place where business-logic
   /// is implemented and where Model state transitions occur. In _reactive_
-  /// state management, usually `notify` is null and `fix` alone sends state
+  /// state management, usually `after` is null and `fix` alone sends state
   /// copies up some Stream.
-  TogglerValidateFix? fix;
+  TogglerStateFixer? fix;
 
   /// All Toggler members are public for easy tests and custom serialization.
   /// Toggler object with state transition handler (`fix`), or notifiers
-  /// (`notify` or `notifier`) is said to be a _live_ one. Otherwise, if all
+  /// (`after` or `notifier`) is said to be a _live_ one. Otherwise, if all
   /// handlers are null, it is a _state copy_ object.
   Toggler({
     this.notifier,
-    this.notify,
+    this.after,
     this.fix,
     this.tg = 0,
     this.ds = 0,
@@ -112,9 +112,9 @@ class Toggler {
   /// flag can be set on a _live_ Toggler by an outer code. 'Done' always
   /// is cleared at any state change, ie. right after any setter runs.
   ///
-  /// Both `fix` and `notify` handlers may test _oldState_ whether _done_ was
+  /// Both `fix` and `after` handlers may test _oldState_ whether _done_ was
   /// set.  The `fix` handler may also set _done_ on a _newState_ to suppress
-  /// subsequent _notify_ (_done_ from `fix` does __not__ make to the commited
+  /// subsequent _after_ (_done_ from `fix` does __not__ make to the commited
   /// new state).
   ///
   /// In _reactive_ settings _done_ flag can be set on a state clone to mark it
@@ -197,11 +197,11 @@ class Toggler {
     if (ntg != tg) pump(i, ntg, false, false);
   }
 
-  /// returns a deep copy of the Toggler, including `notify`, `notifier`, and
+  /// returns a deep copy of the Toggler, including `after`, `notifier`, and
   /// `fix` references; _done_ flag is cleared always.
   Toggler clone() => Toggler(
       notifier: notifier,
-      notify: notify,
+      after: after,
       fix: fix,
       tg: tg,
       ds: ds,
@@ -253,14 +253,14 @@ class Toggler {
   void disable(int i) => setDS(i, true);
 
   /// _true_ if other copy has been created after us. A live Toggler object
-  /// (one with a non-null notify) can never be older than a copy or other live
-  /// Toggler.
+  /// (one with a non-null _after_ function) can never be older than a copy or
+  /// other live Toggler.
   ///
   /// Note! A concession is made for _reactive_ uses: live state clones with
   /// only `fix` attached compare with each other just as copies do.
-  bool isOlderThan(Toggler other) => notify != null
+  bool isOlderThan(Toggler other) => after != null
       ? false
-      : other.notify != null
+      : other.after != null
           ? true
           : hh.toUnsigned(_bf) >> 16 < other.hh.toUnsigned(_bf) >> 16;
 
@@ -269,15 +269,15 @@ class Toggler {
   /// really really KWYAD.  For legitimate use of pump see `replay(cas)` method
   /// in example TogglerRx extension.
   void pump(int i, int nEW, bool isDs, bool actSet) {
-    if (notify == null && notifier == null && fix == null) {
+    if (after == null && notifier == null && fix == null) {
       chb = isDs ? ds ^ nEW : tg ^ nEW;
       isDs ? ds = nEW : tg = nEW;
       return;
     }
     final oldS = Toggler(tg: tg, ds: ds, rg: rg, hh: hh);
-    if (done) oldS.setDone(); // fix and notify should know
+    if (done) oldS.setDone(); // fix and after should know
     final nhh = (((hh.toUnsigned(_bf) >> 16) + 1) << 16) | // serial++
-        ((hh.toUnsigned(8) & ~0xff) | // b15..b8: internal use
+        (hh.toUnsigned(8) | //  b15..b13 reserved, b12..b8: brand
             (isDs ? (1 << 7) : 0) | // cabyte b7: tg/ds
             (actSet ? (1 << 6) : 0) | //      b6: clear/set
             i.toUnsigned(6)); //          b5..b0: item index
@@ -305,8 +305,8 @@ class Toggler {
       chb = isDs ? ds ^ nEW : tg ^ nEW;
       isDs ? ds = nEW : tg = nEW;
     }
-    if (notify != null) {
-      done ? rg = rg.toUnsigned(_im) : notify!(oldS, this);
+    if (after != null) {
+      done ? rg = rg.toUnsigned(_im) : after!(oldS, this);
     } else if (notifier != null) {
       done ? rg = rg.toUnsigned(_im) : notifier!.pump(chb);
     }
@@ -322,7 +322,7 @@ class Toggler {
   /// is not met, or ranges touch or overlap, radioGroup will throw on debug
   /// build, or it will set error flag on _release_ build.
   ///
-  /// A radioGroup creation does not `notify`. Any number of calls to radioGroup
+  /// A radioGroup creation does not `after`. Any number of calls to radioGroup
   /// can be replaced by assigning a predefined constant to the `rm` member.
   void radioGroup(int first, int last) {
     if (first > _im || last > _im || last < 0 || first < 0 || first >= last) {
@@ -432,17 +432,19 @@ class Toggler {
 }
 
 /// `fix` function signature
-typedef TogglerValidateFix = bool Function(Toggler oldState, Toggler newState);
+typedef TogglerStateFixer = bool Function(Toggler oldState, Toggler newState);
 
-/// `notify` function signature
-typedef TogglerChangeNotify = void Function(Toggler oldState, Toggler current);
+/// `after` function signature
+typedef TogglerAfterChange = void Function(Toggler oldState, Toggler current);
 
 // coverage:ignore-start
 /// Toggler's change notification dispatcher, an abstract interface.
-/// _Note: example code below uses `WatchX` of `get_it_mixin` package:
-/// neither `WatchX` is a part of Toggler, nor Toggler depends on get_it_mixin._
+/// Concrete implementation can be found in `package:uinotifier/uinotifier.dart`
+///
+/// _Note: docs example code below uses `WatchX` of `get_it_mixin` package:
+/// neither `WatchX` is a part of Toggler, nor Toggler depends on get_it_mixin.
 /// See Flutter example for concrete implementation of ToggledNotifier (the
-/// _UiNotifier_ class).
+/// _UiNotifier_ class)._
 abstract class ToggledNotifier {
   // @mustBeOverridden
   /// the _chb_ recent changes bitmask is to be pumped here.

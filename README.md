@@ -1,6 +1,6 @@
 **Toggler** manages App state booleans: with easy state transitions, pre-commit state validation, and post-commit change notifications.
 
-**Toggler** object keeps state of up to 52 boolean values (items) that can be manipulated one by one or in concert. _Radio group_ behaviour can be declared on up to 17 separated groups of items. Independent _disabled_ property is avaliable for every item – to be used from within UI builders.
+**Toggler** object keeps state of up to 52 boolean values (items) that can be manipulated one by one or in concert. _Radio group_ behaviour can be declared on up to 17 separated groups of items. Independent _disabled_ property is avaliable for every item – to be used from within UI builders. If 52 is not enough, Togglers can be used in paralel or even cascaded.
 
 **Toggler** was designed specifically for singleton _Models_ and for _observer_ style state flows, though it can also be used in _reactive_ state management architectures via its `state` and `clone` copying constructors.  For safe use within a singleton _Model_ Toggler has built-in data race detection and automatically skips changes coming from an outdated ancestor state.
 
@@ -19,7 +19,7 @@ Test coverage: `100.0% (154 of 154 lines)`
      const tgClaim = tgIndexMax; // max Toggler item index (51)
  ```
  4. add a ValueNotifier `final fchg = ValueNotifier<int>(0)` to your Model
- 4. add Toggler `final tog = Toggler(notify: (Toggler _, Toggler n) => fchg.value = n.serial);`
+ 4. add Toggler `final tog = Toggler(after: (Toggler _, Toggler n) => fchg.value = n.serial);`
  4. wire it to your UI code (_example with [get_it_mixin](https://pub.dev/packages/get_it_mixin)_):
 
 ```Dart
@@ -42,16 +42,17 @@ Test coverage: `100.0% (154 of 154 lines)`
 1. somewhere in your App code a state of a single item in a _live_ Toggler in Model is changed by a `toggle(flagName)` call (or other _state setters_: `set`, `clear`, `enable`, `disable`).
 2. State transition function `bool fix(oldState, newState)` is called next,
 3. then "fixed" new state is commited to the state of Toggler instance,
-4. then `notify(oldState, liveState)` is called, there Model's _ValueNotifiers_ can be updated or _notifyListeners_ called to pass "changed" baton to the Presentation layer.
+4. then `after(oldState, liveState)` is called, there Model's _ValueNotifiers_ can be updated or _notifyListeners_ called to pass "changed" baton to the Presentation layer.
 
 If `fix` handler has not been provided, any single item change made by setter is commited immediately. Otherwise `fix` is called with _newState_ reflecting change that came from a setter. Then `fix` returns _true_, to have _newState_ commited; Or _false_ for changes to be abandoned.
 
 Your code in `fix` may manipulate _newState_ at will, it even may assign a some predefined const values to the `tg` and/or `ds` properties of it. Usually `fix` is Model's internal function, so it may have access to all other pieces of your business logic.
 
-After succesful new state commit `notify` is called. Within this handler you may selectively check where changes were made, eg using `recent` index, or `differsFrom(oldState, rangeFirst, rangeLast)` helper. Then you may run your chosen state passing machinery (Eg. update InheritedWidget state, feed an EventObserver, push a cloned object to the Stream),
-or better use a suitable ToggledNotifier.
+After succesful new state commit `after` is called. Within this handler you may selectively check where changes were made, eg using `recent` index, or `differsFrom(oldState, rangeFirst, rangeLast)` helper. Then you may run your chosen state passing machinery (Eg. update InheritedWidget state, feed an EventObserver, push a cloned object to the Stream).
 
-For a most seamless integration with View layer, an implementation of `ToggledNotifier` can be given instead of `notify` handler function. If `ToggledNotifier` is used together with [get_it_mixin](https://pub.dev/packages/get_it_mixin), Toggler state and UI can be bound in any place within _StatelessWidgets_ tree and have containing Widget be automatically updated on relevant changes. Just by two lines of code:
+Or better use a suitable implementation of [ToggledNotifier](https://pub.dev/packages/uinotifier). `UiNotifier` class was designed along the Toggler library and gives seamless integration of View layer made with _Flutter_.
+
+An implementation of `ToggledNotifier` can be given instead of `after` handler function (that stays _null_). If `ToggledNotifier` is used together with [get_it_mixin](https://pub.dev/packages/get_it_mixin), Toggler state and UI can be bound in any place within _StatelessWidgets_ tree and have containing Widget be automatically updated on relevant changes. Just by two lines of code:
 ```Dart
 const tgUp = 4; const tmUp = 1 << tgUp; // item index 4, changed mask 16
 const tgDn = 5; const tmDn = 1 << tgDn; // item index 5, changed mask 32
@@ -70,12 +71,35 @@ const tgDn = 5; const tmDn = 1 << tgDn; // item index 5, changed mask 32
 ```
 _See Flutter example for the whole..._
 
-### API 101
+
+## If 52 is not enough.
+1. Before you will use paralel or cascaded settings, consider operating on submodels, eg. per route or per functionality. This is a safest and most maintanable way.
+2. If your App really needs a single _Model_ but most of its state can be separated, you may use _Togglers_ in **paralel**: name your Togglers accordingly, give each its own business logic implementation (`fix`), and have each to have its own _UiNotifier_. Unfortunately you also need to name same indice numbers for each of them. This can be error-prone down the time.
+
+Usual code then will look like:
+  ```Dart
+  // in common_names
+  const tg_Search_InProgress = 7; // 7 once
+  const tg_Basket_Emptied = 7; //    7 twice! There be dragons!
+  // ...
+  // in ViewModel
+  final tgSearch = Toggler(notifier: UiNotifier());
+  final tgBasket = Toggler(notifier: UiNotifier());
+  final tgCkout = Toggler(notifier: UiNotifier());
+  // ... in UI tree for Basket:
+    final m = get<ViewModel>();
+    watchX((ToggledNotifier _) => m.tgBasket.notifier!(tmDn | tmUp));
+  ```
+3. As all Togglers are owned by your _ViewModel_ (or _Model_), all may have their state cross-examined and changed - by reserving a cross messaging flags like "tgSearchChanged", "tgBasketChanged", and so on. This is a **cascade**. This still needs a great effort to deal with named indice duplicate numbers.
+4. Use _branded_ togglers chosen from a list of up to 32. See `BrandedToggler` extension in examples. Branded Toggler objects may work in paralel, or in cascade settings - and your named indice numbers are all unique. For the cost of additional two calls per index use.
+
+
+## API 101
 
 #### constructors:
-- `Toggler({fix: onChange, notify: afterChange, tg: 0, ds: 0, rm: 0, cm: 0, hh: 0})`
-  > at least `notify` is needed to make a _live_ Toggler. All other members can be given to default constructor, too - used eg. in saved state deserializer and tests. An all-default Toggler can be mutated at will, eg. in an explicit App state initializer, then `notify` and/or `fix` handlers can be attached later.
-- `state()` method returns a _copy of state_ only (ie. with `fix` = `notify` = null).
+- `Toggler({fix: onChange, after: afterChange, tg: 0, ds: 0, rm: 0, cm: 0, hh: 0})`
+  > at least `after` is needed to make a _live_ Toggler. All other members can be given to default constructor, too - used eg. in saved state deserializer and tests. An all-default Toggler can be mutated at will, eg. in an explicit App state initializer. The `after`, or `notifier`, and/or `fix` handlers can be attached later.
+- `state()` method returns a _copy of state_ only (ie. with `fix` = `after` = null).
 - `clone()` method returns a deep copy of `this`. _Caveat emptor!_
 
 #### getters:

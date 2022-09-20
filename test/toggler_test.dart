@@ -17,7 +17,7 @@ void main() {
 
     setUp(() {
       flags.tg = flags.ds = flags.rg = flags.hh = flags.chb = 0; // reset
-      flags.fix = flags.notify = null;
+      flags.fix = flags.after = null;
     });
 
     test('Set 0 Max', () {
@@ -100,7 +100,7 @@ void main() {
     });
     // test('name ', () {});
     test('generational behaviour [A]', () {
-      var cLive = Toggler(notify: (Toggler a, Toggler b) => a.isOlderThan(b));
+      var cLive = Toggler(after: (Toggler a, Toggler b) => a.isOlderThan(b));
       var c0 = cLive.state();
       var c1 = cLive.state();
       cLive.set(7);
@@ -112,11 +112,11 @@ void main() {
       expect(c2.isOlderThan(c2), isFalse); // copy to copy
     });
     test('generational behaviour [B]', () {
-      var cLive = Toggler(notify: (Toggler a, Toggler b) {});
+      var cLive = Toggler(after: (Toggler a, Toggler b) {});
       var c0 = cLive.state();
       var c1 = cLive.state();
       cLive.set(7);
-      var cL2 = Toggler(notify: (Toggler a, Toggler b) {});
+      var cL2 = Toggler(after: (Toggler a, Toggler b) {});
       var c4 = cLive.state();
       expect(cLive.isOlderThan(cL2), isFalse); // live to live, always false
       expect(c4.isOlderThan(cL2), isTrue); // copy to live, always true
@@ -304,13 +304,13 @@ void main() {
       flags.tg = flags.ds = flags.rg = 0;
       flags.hh = ohh;
       flags.fix = chfix;
-      flags.notify = chnote;
+      flags.after = chnote;
       ntlast = 0;
       filast = 0;
     });
 
     test('no history changes', () {
-      flags.notify = null;
+      flags.after = null;
       flags.fix = null;
       flags.toggle(5);
       expect(flags[5] && flags.hh == ohh, isTrue);
@@ -336,7 +336,7 @@ void main() {
       expect(c2.done, isFalse);
     });
     test('history changes with just fix', () {
-      flags.notify = null;
+      flags.after = null;
       flags.toggle(5);
       expect(flags[5], isTrue);
       expect(flags.hh != ohh, isTrue);
@@ -350,13 +350,13 @@ void main() {
     });
     test('history changes with just notifier', () {
       flags.fix = null;
-      flags.notify = null;
+      flags.after = null;
       flags.notifier = TCNo();
       flags.toggle(5);
       expect(flags[5] && flags.hh != ohh, isTrue);
     });
     test('done is cleared on fix only', () {
-      flags.notify = null;
+      flags.after = null;
       expect(flags.done, isFalse);
       flags.setDone();
       expect(flags.done, isTrue);
@@ -387,7 +387,7 @@ void main() {
     });
     test('done is cleared on notifier only', () {
       flags.fix = null;
-      flags.notify = null;
+      flags.after = null;
       flags.notifier = TCNo();
       expect(flags.done, isFalse);
       flags.setDone();
@@ -403,7 +403,7 @@ void main() {
     test('notifier should fire alone', () {
       var noo = TCNo();
       flags.fix = null;
-      flags.notify = null;
+      flags.after = null;
       flags.notifier = noo;
       flags.toggle(5);
       expect(flags.chb == noo.seen, isTrue);
@@ -436,7 +436,7 @@ void main() {
       return true;
     }
 
-    final flags = Toggler(notify: chnote, fix: chfix);
+    final flags = Toggler(after: chnote, fix: chfix);
 
     setUp(() {
       flags.tg = flags.ds = flags.rg = flags.hh = 0; // reset
