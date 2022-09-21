@@ -63,14 +63,18 @@ class Toggler {
   int hh;
 
   /// handler `void after(Toggler oldState, Toggler current)`
-  /// is called after state change has been _commited_.
+  /// is called after state change has been _commited_. If not null, it is
+  /// expected to deal also with after-change notifications. Eg. passing current
+  /// _chb_ to _notifier_, if state changes should be known by outer world.
+  /// Ie. its last line should say `current.notifier!.pump(current.chb);`
   TogglerAfterChange? after;
 
   /// Concrete implementation of ToggleNotifier class. If given, it will be
   /// _pumped_ with _chb_ after any change if _fix_ will return _true_ and new
   /// state is not _done_. If both _notifier_ object and _after_ handler are
   /// given, _notifier_ is **not** run automatically: if needed, you should
-  /// _pump_ it from within your _after_ handler yourself.
+  /// _pump_ it from within your _after_ handler yourself. Ie. your last line
+  /// of _after_ handler should say `current.notifier!.pump(current.chb);`
   ToggledNotifier? notifier;
 
   /// handler `bool fix(Toggler oldState, Toggler newState)`
@@ -194,7 +198,7 @@ class Toggler {
     if (ifActive && !active(i)) return;
     int ntg = tg;
     ntg &= ~(1 << _v(i));
-    if (ntg != tg) pump(i, ntg, false, false);
+    if (ntg != tg) verto(i, ntg, false, false);
   }
 
   /// returns a deep copy of the Toggler, including `after`, `notifier`, and
@@ -263,54 +267,6 @@ class Toggler {
       : other.after != null
           ? true
           : hh.toUnsigned(_bf) >> 16 < other.hh.toUnsigned(_bf) >> 16;
-
-  /// Toggler change engine. Exposed only to allow straighforward testing and
-  /// debugging Apps.  Do not call `pump` for managing App state unless you
-  /// really really KWYAD.  For legitimate use of pump see `replay(cas)` method
-  /// in example TogglerRx extension.
-  void pump(int i, int nEW, bool isDs, bool actSet) {
-    if (after == null && notifier == null && fix == null) {
-      chb = isDs ? ds ^ nEW : tg ^ nEW;
-      isDs ? ds = nEW : tg = nEW;
-      return;
-    }
-    final oldS = Toggler(tg: tg, ds: ds, rg: rg, hh: hh);
-    if (done) oldS.setDone(); // fix and after should know
-    final nhh = (((hh.toUnsigned(_bf) >> 16) + 1) << 16) | // serial++
-        ((hh.toUnsigned(16) & 0xff00) | //  b15..b13 reserved, b12..b8: brand
-            (isDs ? (1 << 7) : 0) | // cabyte b7: tg/ds
-            (actSet ? (1 << 6) : 0) | //      b6: clear/set
-            i.toUnsigned(6)); //          b5..b0: item index
-    if (fix != null) {
-      final newS =
-          Toggler(tg: isDs ? tg : nEW, ds: isDs ? nEW : ds, rg: rg, hh: nhh);
-      newS.chb = isDs ? ds ^ nEW : tg ^ nEW; // pass coming single change bit
-      if (fix!(oldS, newS)) {
-        if (hh != oldS.hh) {
-          ds |= 1 << _bf;
-          error = true;
-          assert(hh == oldS.hh,
-              'Data race detected on state update! [history: ${hh.toUnsigned(16)}]');
-          return;
-        }
-        tg = newS.tg;
-        ds = newS.ds;
-        hh = newS.hh;
-        rg = newS.rg; // may come 'done'
-        chb = (tg ^ oldS.tg) | (ds ^ oldS.ds); // change mask of fixed
-      }
-    } else {
-      hh = nhh;
-      rg = rg.toUnsigned(_im);
-      chb = isDs ? ds ^ nEW : tg ^ nEW;
-      isDs ? ds = nEW : tg = nEW;
-    }
-    if (after != null) {
-      done ? rg = rg.toUnsigned(_im) : after!(oldS, this);
-    } else if (notifier != null) {
-      done ? rg = rg.toUnsigned(_im) : notifier!.pump(chb);
-    }
-  }
 
   /// radioGroup declares a range of items that have "one of" behaviour.
   /// Ranges may not overlap nor even be adjacent. Ie. there must be at least
@@ -381,7 +337,7 @@ class Toggler {
       }
     }
     ntg |= 1 << i;
-    if (ntg != tg) pump(i, ntg, false, true);
+    if (ntg != tg) verto(i, ntg, false, true);
   }
 
   /// sets done, always returns true (for `setDone() ? ... : null ` constructs).
@@ -393,7 +349,7 @@ class Toggler {
   void setDS(int i, bool disable) {
     int nds = ds;
     disable ? nds |= 1 << _v(i) : nds &= ~(1 << _v(i));
-    if (nds != ds) pump(i, nds, true, disable);
+    if (nds != ds) verto(i, nds, true, disable);
   }
 
   /// sets item state at index `i` to the explicit given value.
@@ -418,9 +374,57 @@ class Toggler {
     if (tg & (1 << _v(i)) != 0) {
       int ntg = tg;
       ntg &= ~(1 << i);
-      if (ntg != tg) pump(i, ntg, false, false);
+      if (ntg != tg) verto(i, ntg, false, false);
     } else {
       set(i);
+    }
+  }
+
+  /// Toggler change engine. Exposed only to allow straighforward testing and
+  /// debugging Apps.  Do not call `verto` for managing App state unless you
+  /// really really KWYAD.  For legitimate use of `verto` see `replay(cas)`
+  /// method in example TogglerRx extension. (_Verto means 'turn' in Latin_).
+  void verto(int i, int nEW, bool isDs, bool actSet) {
+    if (after == null && notifier == null && fix == null) {
+      chb = isDs ? ds ^ nEW : tg ^ nEW;
+      isDs ? ds = nEW : tg = nEW;
+      return;
+    }
+    final oldS = Toggler(tg: tg, ds: ds, rg: rg, hh: hh);
+    if (done) oldS.setDone(); // fix and after should know
+    final nhh = (((hh.toUnsigned(_bf) >> 16) + 1) << 16) | // serial++
+        ((hh.toUnsigned(16) & 0xff00) | //  b15..b13 reserved, b12..b8: brand
+            (isDs ? (1 << 7) : 0) | // cabyte b7: tg/ds
+            (actSet ? (1 << 6) : 0) | //      b6: clear/set
+            i.toUnsigned(6)); //          b5..b0: item index
+    if (fix != null) {
+      final newS =
+          Toggler(tg: isDs ? tg : nEW, ds: isDs ? nEW : ds, rg: rg, hh: nhh);
+      newS.chb = isDs ? ds ^ nEW : tg ^ nEW; // pass coming single change bit
+      if (fix!(oldS, newS)) {
+        if (hh != oldS.hh) {
+          ds |= 1 << _bf;
+          error = true;
+          assert(hh == oldS.hh,
+              'Data race detected on state update! [history: ${hh.toUnsigned(16)}]');
+          return;
+        }
+        tg = newS.tg;
+        ds = newS.ds;
+        hh = newS.hh;
+        rg = newS.rg; // may come 'done'
+        chb = (tg ^ oldS.tg) | (ds ^ oldS.ds); // change mask of fixed
+      }
+    } else {
+      hh = nhh;
+      rg = rg.toUnsigned(_im);
+      chb = isDs ? ds ^ nEW : tg ^ nEW;
+      isDs ? ds = nEW : tg = nEW;
+    }
+    if (after != null) {
+      done ? rg = rg.toUnsigned(_im) : after!(oldS, this);
+    } else if (notifier != null) {
+      done ? rg = rg.toUnsigned(_im) : notifier!.pump(chb);
     }
   }
 
@@ -429,7 +433,7 @@ class Toggler {
 
   /// unconditionally set value of item at index _i_.
   void operator []=(int i, bool v) => setTo(i, v);
-}
+} // class Toggler
 
 /// `fix` function signature
 typedef TogglerStateFixer = bool Function(Toggler oldState, Toggler newState);
@@ -458,8 +462,8 @@ abstract class ToggledNotifier {
 
   // @mustBeOverridden
   /// used to get _indexed_ notifiers
-  /// eg. `watchX((ToggledNotifier x) => x[tgSendAction]);`
-  dynamic operator [](int index) =>
+  /// eg. `watchX((ToggledNotifier x) => x.single(tgSendAction);`
+  dynamic single(int index) =>
       throw UnimplementedError('operator [] not implemented');
 
   /// set _indexed_ notifiers, use only in test pipelines

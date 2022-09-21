@@ -2,65 +2,74 @@
 
 import 'package:toggler/toggler.dart';
 
+/// **always** use symbolic names for Toggler item (bit) index
+const tgName0 = 0;
+const tgNameA = 1;
+const tgNameB = 2;
+const tgNameC = 3;
+const tgNameD = 4;
+const tgNameE = 5;
+const tgNameF = 6;
+
 void main() {
-  void ourNotify(_, Toggler cu) {
+  void ourAfterHandler(_, Toggler cu) {
     var tg = '    set: ';
     var ds = ' active: ';
     for (int i = 0; i < 27; i++) {
       tg += cu[i] ? ' ^' : ' -';
       ds += cu.active(i) ? ' .' : ' !';
     }
-    print('kTGname:  0 A B C D E F G H I J K L M N O P Q R S T U W V X Y Z');
+    print(' tgName:  0 A B C D E F G H I J K L M N O P Q R S T U W V X Y Z');
     print(tg);
     print(ds);
     print('          -----------------------------------------------------');
   }
 
   // pt is a copy of previous state, cu is the current (live) state
-  bool ourCheck(Toggler oS, Toggler nS) {
-    // validate: 'NameA' can toggle only if 'Name0' was set.
-    if (!oS[kTGname0] && oS[kTGnameA] != nS[kTGnameA]) {
+  bool ourStateFixer(Toggler oS, Toggler nS) {
+    // 'NameA' may toggle only if 'Name0' was previously set.
+    if (!oS[tgName0] && oS[tgNameA] != nS[tgNameA]) {
       print('      >>> NameA change supressed by validator');
       return false; // disallow change to 'NameA'
     }
     // fix B,C if F radio was toggled
-    if (oS[kTGnameF] != nS[kTGnameF]) {
-      if (nS[kTGnameF]) {
-        nS.disable(kTGnameB);
-        nS.disable(kTGnameC);
-        nS.clear(kTGnameB);
-        nS.clear(kTGnameC);
+    if (oS[tgNameF] != nS[tgNameF]) {
+      if (nS[tgNameF]) {
+        nS.disable(tgNameB);
+        nS.disable(tgNameC);
+        nS.clear(tgNameB);
+        nS.clear(tgNameC);
       } else {
-        nS.enable(kTGnameB);
-        nS.enable(kTGnameC);
+        nS.enable(tgNameB);
+        nS.enable(tgNameC);
       }
     }
     return true; // accept changes
   }
 
-  final flags = Toggler(after: ourNotify, fix: ourCheck);
+  final flags = Toggler(after: ourAfterHandler, fix: ourStateFixer);
 
   // declare a radioGroup, up to 17 groups can be made over 51 items.
-  flags.radioGroup(kTGnameD, kTGnameF);
+  flags.radioGroup(tgNameD, tgNameF);
   // fiddle:
-  print('Trying to set A (ourCheck validator disallows this)');
-  flags.set(kTGnameA);
+  print('Trying to set A (StateFix validator disallows this)');
+  flags.set(tgNameA);
   print('Set 0, NameA can be set only if Name0 was set before');
-  flags.set(kTGname0);
+  flags.set(tgName0);
   print('Now A is allowed to be toggled');
-  flags.set(kTGnameA);
+  flags.set(tgNameA);
   print('Set B');
-  flags.set(kTGnameB);
+  flags.set(tgNameB);
   print('Set C');
-  flags.set(kTGnameC);
+  flags.set(tgNameC);
   print('Set D (of D..F radio group)');
-  flags.set(kTGnameD);
+  flags.set(tgNameD);
   print('Set E of radio D..F - D will clear automatically.');
-  flags.set(kTGnameE);
-  print('Set F radio. E will clear then B and C are disabled by ourCheck');
-  flags.set(kTGnameF);
-  print('Set D radio. F will clear; then B and C are enabled by ourCheck');
-  flags.set(kTGnameD);
+  flags.set(tgNameE);
+  print('Set F radio. E will clear then B and C are disabled by StateFix');
+  flags.set(tgNameF);
+  print('Set D radio. F will clear; then B and C are enabled by StateFix');
+  flags.set(tgNameD);
 }
 
 /// toMask int extensiom takes index and returns const in with 1 set at index
@@ -128,35 +137,6 @@ extension TogglerRx on Toggler {
         : actS
             ? tg |= (1 << i)
             : tg &= ~(1 << i);
-    pump(i, va, isDs, actS);
+    verto(i, va, isDs, actS);
   }
 }
-
-/// always use symbolic index
-const kTGname0 = 0;
-const kTGnameA = 1;
-const kTGnameB = 2;
-const kTGnameC = 3;
-const kTGnameD = 4;
-const kTGnameE = 5;
-const kTGnameF = 6;
-const kTGnameG = 7;
-const kTGnameH = 8;
-const kTGnameI = 9;
-const kTGnameJ = 10;
-const kTGnameK = 11;
-const kTGnameL = 12;
-const kTGnameM = 13;
-const kTGnameN = 14;
-const kTGnameO = 15;
-const kTGnameP = 16;
-const kTGnameQ = 17;
-const kTGnameR = 18;
-const kTGnameS = 19;
-const kTGnameT = 20;
-const kTGnameU = 21;
-const kTGnameW = 22;
-const kTGnameV = 23;
-const kTGnameX = 24;
-const kTGnameY = 25;
-const kTGnameZ = 26;
