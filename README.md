@@ -32,19 +32,34 @@ Test coverage: `100.0% (162 of 162 lines)`
  ```
 _See toggler_example.dart for Toggler basics (and possible Toggler extensions)._
 
-There is also a complete Toggler based state manager for Flutter Apps called [UiModel](https://pub.dev/packages/uimodel). With it and [get_it_mixin](https://pub.dev/packages/get_it_mixin) you may seamlessly bind your _Flutter_ Views to your Models and vice versa. It takes just two lines:
+There is also a complete Toggler based state manager for Flutter Apps called [UiModel](https://pub.dev/packages/uimodel). With it and [get_it_mixin](https://pub.dev/packages/get_it_mixin) you may seamlessly bind your _Flutter_ Views to your Models and vice versa. It takes just two lines per Widget observing Model:
 ```Dart
-// ... somewhere in stateless widget build:
+// early on you make a ViewModel:
+class ViewModel with UiModel { // so your ViewModel now has a Toggler
+} // and register it as a get-it-table singleton
+void main() {
+   GetIt.I.registerSingleton<ViewModel>(ViewModel());
+   runApp(const MyApp()); // then you run your App
+}
+// ...
+// ...deep into the tree, in a stateless widget, stages 1, 2, 3, 4, 5 occur:
+// (1) get ViewModel at hand
+// (2) bind to change notifications,
+// (3) read and use data from Model
+// (4) hook actions to Model
+//     -> Model changes
+// (5) rebuild on either notification
   Widget build(BuildContext context) {
-    final m = get<ViewModel>(); //         1. have whole ViewModel at hand
-    watch(target: m(smTurn | smPrize)); // 2. rebuild on either signal.
-    // Thats all. View and Model are now binded. View knows of M changes...
-      // ... can read any data from Model ...
-      Text('${m.prize}'),
-        // ... then complete the flow by hooking actions to Model methods:
-        m[tgPrize]
-          ? IconButton(onPressed: m.claim, icon: const Icon(Icons.remove_circle)),
-          : IconButton(onPressed: m.bet, icon: const Icon(Icons.add_circle)),
+    final m = get<ViewModel>(); // (1)  Two lines, as promised
+    watch(target: m(smTurn | smPrize)); // (2), (5)
+    // Here View knows M and knows when M changes at Turn or Prize ...
+      // it can read data from Model ...
+      Text('${m.prize}'), // (3)
+        // then it both begins and completes the MVVM flow
+        // by hooking actions to Model methods:
+        m[tgPrize] // (3)
+          ? MyFancyButton(onPressed: m.claim), // (4)
+          : MyFancyButton(onPressed: m.droll), // (4)
 ```
 _See example/flutter_example.dart for a complete app code._
 
