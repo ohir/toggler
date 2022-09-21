@@ -2,7 +2,13 @@
 
 import 'package:toggler/toggler.dart';
 
-/// **always** use symbolic names for Toggler item (bit) index
+/// This is a CLI example. Toggler does not depend on Flutter, but is a basis
+/// of UiModel mixin that let bind Flutter widget tree and ViewModel in just
+/// two lines of code per your custom Widget.
+
+/// **Always** use symbolic names for Toggler item (bit) index.
+/// You may stub tgNames and smNames using `tool/print_named_indice.dart` script.
+/// `dart run tool/print_named_indice.dart > lib/src/tg_names.dart`
 const tgName0 = 0;
 const tgNameA = 1;
 const tgNameB = 2;
@@ -25,7 +31,9 @@ void main() {
     print('          -----------------------------------------------------');
   }
 
-  // pt is a copy of previous state, cu is the current (live) state
+  // oS is a copy of our previous state, nS is our the "to be" state
+  // `fix` handler implements a "business logic" or "view logic", in
+  // simpler Apps it may implement both.
   bool ourStateFixer(Toggler oS, Toggler nS) {
     // 'NameA' may toggle only if 'Name0' was previously set.
     if (!oS[tgName0] && oS[tgNameA] != nS[tgNameA]) {
@@ -44,7 +52,8 @@ void main() {
         nS.enable(tgNameC);
       }
     }
-    return true; // accept changes
+    return true; // accept changes and instruct Toggler to commit new state
+    // return false; // instruct Toggler to abandon changes
   }
 
   final flags = Toggler(after: ourAfterHandler, fix: ourStateFixer);
@@ -72,56 +81,48 @@ void main() {
   flags.set(tgNameD);
 }
 
-/// toMask int extensiom takes index and returns const in with 1 set at index
-extension TogglerMask on int {
-  toMask(int i) => i >= 0 && i <= tgIndexMax ? 1 << i : 0;
-}
+/// A few extensions are put here to show how Toggler can be tailored for
+/// different purposes.
 
-extension BrandedTogglers on Toggler {
-  /// _brand_ property allows to give Toggler object a number in 0..31 range.
-  /// Then a single common `fix` method may know which one of that many
-  /// Togglers changed its state and called it (_fix_). These Togglers usually
-  /// are put on a List<Toggler> under _brand_ index.
-  int get brand => hh.toUnsigned(13) >> 8;
-  set brand(int i) => hh = hh & ~0x1f00 | i.toUnsigned(5) << 6;
-
-  /// returns _true_ if brand of object and brand in _branded index_ match,
-  /// and if resulting index can safely be used in Toggler methods.
-  bool checkBrand(int i) =>
-      i >= 0 && hh & 0x1f00 == i & 0x1f00 && i & 0x3f <= tgIndexMax;
-
-  /// zeroes brand bits of _i_ index so returned int can be used with
-  /// Toggler methods (note that _i_ should always be subject to _checkBrand_
-  /// before clamping: `if (tgo.checkBrand(bi)) smth = tgo[clampBrand(bi)]`)
-  int clampBrand(int i) => i.toUnsigned(6);
-
-  /// merge this object brand bits into the index
-  int brandIndex(int i) => (hh & 0x1f00) >> 2 | i.toUnsigned(5);
-}
-
-/// for use in Rx settings state methods can be added as an extension
+/// If you migrate from (or still use) _reactive_ style state management
+/// you may extend Toggler to get it feel Rx familiar.
 extension TogglerRx on Toggler {
-  /// apply externally mutated state to the _Model_ object.
+  /// unconditionally remove handlers from cloned object
+  void freeze() => fix = after = notifier = null;
+
+  /// apply externally mutated state, opt forcibly, opt fire notifications.
   bool apply(Toggler src, {bool doNotify = true, bool force = false}) {
     if (!force && hh > src.hh) return false;
     Toggler? oldS;
-    if (doNotify && after != null) oldS = state();
+    if (after != null || notifier != null) oldS = state();
     tg = src.tg;
     ds = src.ds;
     rg = src.rg;
     hh = src.hh;
-    if (doNotify && after != null) after!(oldS!, this);
+    if (oldS != null) {
+      chb = (tg ^ oldS.tg) | (ds ^ oldS.ds);
+      if (doNotify) {
+        if (after != null) {
+          after!(oldS, this);
+        } else if (notifier != null) {
+          notifier!.pump(chb);
+        }
+      }
+    }
     return true;
   }
+}
 
-  /// unconditionally remove handlers from cloned object
-  void freeze() => fix = after = null;
-
-  /// _compact action byte_ of the most recent change coming from a state setter.
-  /// For use with `replay` method below.
+/// If your UI is based on UiModel mixin, `replay` can be used to "demo play"
+/// live App actions, giving eg. an interactive tutorial. Replay can allow us to
+/// get our _debug_ App to the same state a bug reporter person experienced.
+extension TogglerReplay on Toggler {
+  /// _compact action byte_ is the most recent change coming from a state setter.
+  /// Saved (by `fix` or `after`) to the bytes blob it can be used to feed the
+  /// [replay] method below.
   ///
-  /// CAbyte keeps _incoming_ changes, not ones made internally by `fix`.
-  /// CAbyte layout: `(0/1) b7:tg/ds b6:clear/set b5..b0 change index`
+  /// CaByte keeps _incoming_ changes, not ones made internally by `fix`.
+  /// CaByte layout: `(0/1) b7:tg/ds b6:clear/set b5..b0 index of change`
   int get cabyte => hh.toUnsigned(8);
 
   /// takes compact action byte and applies it - emulating a setter run.
@@ -139,4 +140,29 @@ extension TogglerRx on Toggler {
             : tg &= ~(1 << i);
     verto(i, va, isDs, actS);
   }
+}
+
+/// For a really big (server side) Models you may reluctantly use branded
+/// Togglers. Don't do it with Flutter - 52 moving parts per route (page) is
+/// for sure too much. With Flutter use submodels owned by your ViewModel.
+extension BrandedTogglers on Toggler {
+  /// _brand_ property allows to give Toggler object a number in 0..31 range.
+  /// Then a single common `fix` method may know which one of that many
+  /// Togglers changed its state and called it (_fix_). These Togglers usually
+  /// are put on a List<Toggler> under _brand_ index.
+  int get brand => hh.toUnsigned(13) >> 8;
+  set brand(int i) => hh = hh & ~0x1f00 | i.toUnsigned(5) << 6;
+
+  /// returns _true_ if brand of object and brand in _branded index_ match,
+  /// and if resulting index can safely be used in Toggler methods.
+  bool checkBrand(int i) =>
+      i >= 0 && hh & 0x1f00 == i & 0x1f00 && i & 0x3f <= tgIndexMax;
+
+  /// zeroes brand bits of _i_ index so returned int can be used with
+  /// Toggler methods (note that _i_ should always be subject to [checkBrand]
+  /// before clamping: `if (tg.checkBrand(bi)) smth = tg[clampBrand(bi)]`)
+  int clampBrand(int i) => i.toUnsigned(6);
+
+  /// merge this object brand bits into the index
+  int brandIndex(int i) => (hh & 0x1f00) >> 2 | i.toUnsigned(5);
 }

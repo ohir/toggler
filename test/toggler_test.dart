@@ -33,13 +33,13 @@ void main() {
     test('Is Set in range set boundry', () {
       flags.set(7);
       flags.set(12);
-      expect(flags.anyInSet(first: 7, last: 10), isTrue);
-      expect(flags.anyInSet(first: 8, last: 12), isTrue);
+      expect(flags.anyInSet(tgFirst: 7, tgLast: 10), isTrue);
+      expect(flags.anyInSet(tgFirst: 8, tgLast: 12), isTrue);
     });
     test('Is Set in range not set boundary', () {
       flags.set(7);
       flags.set(12);
-      expect(flags.anyInSet(first: 8, last: 11), isFalse);
+      expect(flags.anyInSet(tgFirst: 8, tgLast: 11), isFalse);
     });
     test('DisableEnable', () {
       flags.disable(0);
@@ -151,10 +151,10 @@ void main() {
       flags.set(10);
       expect(flags.chb == 1024, isTrue);
       expect(flags.changed(i: 10), isTrue);
-      expect(flags.changed(i: 10, relmask: 7 << 8), isTrue);
-      expect(flags.changed(i: 11, relmask: 7 << 8), isFalse);
-      expect(flags.changed(i: 10, relmask: 7 << 7), isFalse);
-      expect(flags.changed(relmask: 7 << 8), isTrue);
+      expect(flags.changed(i: 10, smMask: 7 << 8), isTrue);
+      expect(flags.changed(i: 11, smMask: 7 << 8), isFalse);
+      expect(flags.changed(i: 10, smMask: 7 << 7), isFalse);
+      expect(flags.changed(smMask: 7 << 8), isTrue);
       flags.set(11);
       flags.set(33);
       flags.disable(51); // cm must reflect any change at index
@@ -176,15 +176,15 @@ void main() {
       expect(c1.differsFrom(flags), isFalse);
       c1.set(5);
       expect(c1.differsFrom(flags), isTrue);
-      expect(c1.differsFrom(flags, relmask: 63), isTrue);
-      expect(c1.differsFrom(flags, relmask: 31), isFalse);
+      expect(c1.differsFrom(flags, smMask: 63), isTrue);
+      expect(c1.differsFrom(flags, smMask: 31), isFalse);
       flags.set(5);
       expect(c1.differsFrom(flags), isFalse);
       flags.set(8);
       c1.set(23);
-      expect(c1.differsFrom(flags, first: 8, last: 22), isTrue);
-      expect(c1.differsFrom(flags, first: 9, last: 22), isFalse);
-      expect(c1.differsFrom(flags, first: 9, last: 23), isTrue);
+      expect(c1.differsFrom(flags, tgFirst: 8, tgLast: 22), isTrue);
+      expect(c1.differsFrom(flags, tgFirst: 9, tgLast: 22), isFalse);
+      expect(c1.differsFrom(flags, tgFirst: 9, tgLast: 23), isTrue);
     });
     test('Set 63 | should throw', () {
       expect(() {
@@ -283,7 +283,7 @@ void main() {
     });
     test('Demand bad diff| should throw', () {
       expect(() {
-        flags.differsFrom(flags.state(), last: 63);
+        flags.differsFrom(flags.state(), tgLast: 63);
       }, throwsAssertionError);
     });
   });
@@ -435,7 +435,7 @@ void main() {
       if (oS.recent == 25) {
         oS.hh <<= 1; // test abandon older state
       }
-      oS.differsFrom(nS, first: 11, last: 16); // cover !differs path
+      oS.differsFrom(nS, tgFirst: 11, tgLast: 16); // cover !differs path
       if (nS[1] && nS.differsFrom(oS)) nS.set(0); // test state fixing on 1
       if (nS[7] && nS.differsFrom(oS)) nS.setDone(); // test skip notify on 7
       if (nS[9] && nS.differsFrom(oS)) nS.done = true; // test skip notify on 9
