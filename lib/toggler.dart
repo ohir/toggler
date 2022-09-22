@@ -354,7 +354,10 @@ class Toggler {
     if (ntg != tg) verto(tgIndex, ntg, false, true);
   }
 
-  /// sets done, always returns true (for `markDone() ? ... : null ` constructs).
+  /// sets done flag and returns _true_.  It is a debug helper method used in
+  /// Flutter code for `markDone() ? : null,` constructs placed at possible end
+  /// of a `build` method, eg. to notify yourself that some conditional build
+  /// completed at an expected path.
   bool markDone() => (rg |= 1 << _bf) != 0;
 
   /// disable (true) or enable (false) an item at index _tgIndex_.
