@@ -22,7 +22,7 @@ void main() {
 
     test('Set 0 Max', () {
       flags[0] = true; // cover []= setter
-      flags.set(tgIndexMax);
+      flags.set1(tgIndexMax);
       expect(
           flags[0] && !flags[1] && !flags[tgIndexMax - 1] && flags[tgIndexMax],
           isTrue);
@@ -31,36 +31,36 @@ void main() {
       expect(!flags[0] && !flags[tgIndexMax], isTrue);
     });
     test('Is Set in range set boundry', () {
-      flags.set(7);
-      flags.set(12);
+      flags.set1(7);
+      flags.set1(12);
       expect(flags.anyInSet(tgFirst: 7, tgLast: 10), isTrue);
       expect(flags.anyInSet(tgFirst: 8, tgLast: 12), isTrue);
     });
     test('Is Set in range not set boundary', () {
-      flags.set(7);
-      flags.set(12);
+      flags.set1(7);
+      flags.set1(12);
       expect(flags.anyInSet(tgFirst: 8, tgLast: 11), isFalse);
     });
     test('DisableEnable', () {
       flags.disable(0);
       expect(flags.active(0), isFalse);
-      flags.set(0, ifActive: true);
+      flags.set1(0, ifActive: true);
       expect(flags[0], isFalse);
       flags.enable(0);
-      flags.set(0, ifActive: true);
+      flags.set1(0, ifActive: true);
       expect(flags[0], isTrue);
     });
     test('setDisable setEnable', () {
       flags.setDS(0, true);
       expect(flags.active(0), isFalse);
-      flags.set(0, ifActive: true);
+      flags.set1(0, ifActive: true);
       expect(flags[0], isFalse);
       flags.setDS(0, false);
-      flags.set(0, ifActive: true);
+      flags.set1(0, ifActive: true);
       expect(flags[0], isTrue);
     });
     test('Disable Max', () {
-      flags.set(tgIndexMax);
+      flags.set1(tgIndexMax);
       flags.disable(tgIndexMax);
       flags.clear(tgIndexMax, ifActive: true);
       flags.setTo(tgIndexMax, false, ifActive: true);
@@ -70,16 +70,16 @@ void main() {
     });
     test('DisableEnable Max-1', () {
       flags.disable(tgIndexMax - 1);
-      flags.set(tgIndexMax - 1, ifActive: true);
+      flags.set1(tgIndexMax - 1, ifActive: true);
       expect(flags[tgIndexMax - 1], isFalse);
       flags.setTo(tgIndexMax - 1, true, ifActive: true);
       expect(flags[tgIndexMax - 1], isFalse);
       flags.enable(tgIndexMax - 1);
-      flags.set(tgIndexMax - 1, ifActive: true);
+      flags.set1(tgIndexMax - 1, ifActive: true);
       expect(flags[tgIndexMax - 1], isTrue);
     });
     test('DisableEnable 33', () {
-      flags.set(33, ifActive: true);
+      flags.set1(33, ifActive: true);
       flags.disable(33);
       flags.clear(33, ifActive: true);
       expect(flags[33], isTrue);
@@ -103,7 +103,7 @@ void main() {
       var cLive = Toggler(after: (Toggler a, Toggler b) => a.isOlderThan(b));
       var c0 = cLive.state();
       var c1 = cLive.state();
-      cLive.set(7);
+      cLive.set1(7);
       var c2 = cLive.state();
       cLive.clear(1);
       expect(c0.isOlderThan(c1), isFalse); // copy to copy
@@ -115,14 +115,14 @@ void main() {
       var cLive = Toggler(after: (Toggler a, Toggler b) {});
       var c0 = cLive.state();
       var c1 = cLive.state();
-      cLive.set(7);
+      cLive.set1(7);
       var cL2 = Toggler(after: (Toggler a, Toggler b) {});
       var c4 = cLive.state();
       expect(cLive.isOlderThan(cL2), isFalse); // live to live, always false
       expect(c4.isOlderThan(cL2), isTrue); // copy to live, always true
 
-      c0.set(15);
-      c1.set(33);
+      c0.set1(15);
+      c1.set1(33);
       expect(c0.hh == c1.hh, isTrue); // copies may not alter history
       expect(c0.serial == c1.serial, isTrue);
       expect(c0.recent == c1.recent, isTrue);
@@ -130,9 +130,9 @@ void main() {
     test('copy may not mutate history', () {
       var c0 = Toggler();
       c0.disable(3);
-      c0.set(2);
+      c0.set1(2);
       var c1 = c0.state();
-      c1.set(16);
+      c1.set1(16);
       var c2 = c1.state();
       expect(
           c0[2] &&
@@ -146,54 +146,54 @@ void main() {
           isTrue);
     });
     test('Change mask A', () {
-      flags.set(0);
+      flags.set1(0);
       expect(flags.chb == 1, isTrue);
-      flags.set(10);
+      flags.set1(10);
       expect(flags.chb == 1024, isTrue);
       expect(flags.changed(i: 10), isTrue);
       expect(flags.changed(i: 10, smMask: 7 << 8), isTrue);
       expect(flags.changed(i: 11, smMask: 7 << 8), isFalse);
       expect(flags.changed(i: 10, smMask: 7 << 7), isFalse);
       expect(flags.changed(smMask: 7 << 8), isTrue);
-      flags.set(11);
-      flags.set(33);
+      flags.set1(11);
+      flags.set1(33);
       flags.disable(51); // cm must reflect any change at index
       expect(flags.chb == 1 << 51, isTrue);
     });
     test('Change mask B', () {
       bool cf(Toggler o, Toggler n) {
-        n.set(1);
+        n.set1(1);
         n.disable(2);
         return true;
       }
 
       flags.fix = cf;
-      flags.set(0);
+      flags.set1(0);
       expect(flags.chb == 7, isTrue); // b0,b1,b2 changed
     });
     test('Differs', () {
       var c1 = flags.state();
       expect(c1.differsFrom(flags), isFalse);
-      c1.set(5);
+      c1.set1(5);
       expect(c1.differsFrom(flags), isTrue);
       expect(c1.differsFrom(flags, smMask: 63), isTrue);
       expect(c1.differsFrom(flags, smMask: 31), isFalse);
-      flags.set(5);
+      flags.set1(5);
       expect(c1.differsFrom(flags), isFalse);
-      flags.set(8);
-      c1.set(23);
+      flags.set1(8);
+      c1.set1(23);
       expect(c1.differsFrom(flags, tgFirst: 8, tgLast: 22), isTrue);
       expect(c1.differsFrom(flags, tgFirst: 9, tgLast: 22), isFalse);
       expect(c1.differsFrom(flags, tgFirst: 9, tgLast: 23), isTrue);
     });
     test('Set 63 | should throw', () {
       expect(() {
-        flags.set(63);
+        flags.set1(63);
       }, throwsAssertionError);
     });
     test('Set -1 | should throw', () {
       expect(() {
-        flags.set(-1);
+        flags.set1(-1);
       }, throwsAssertionError);
     });
   });
@@ -204,8 +204,8 @@ void main() {
       flags.tg = flags.ds = flags.rg = flags.hh = 0; // reset
       flags.radioGroup(kA, kC);
       flags.radioGroup(kE, kH);
-      flags.set(kA);
-      flags.set(kH);
+      flags.set1(kA);
+      flags.set1(kH);
     });
     test('Set overlapping radio | should throw', () {
       expect(() {
@@ -220,13 +220,13 @@ void main() {
     test('Set 0..3 radio', () {
       flags.rg = 0; // reset radios
       flags.radioGroup(k0, kC);
-      flags.set(k0);
+      flags.set1(k0);
       expect(flags[k0], isTrue);
-      flags.set(kC);
+      flags.set1(kC);
       expect(!flags[k0] && !flags[kA] && !flags[kB] && flags[kC], isTrue);
-      flags.set(kB);
+      flags.set1(kB);
       expect(!flags[k0] && !flags[kA] && flags[kB] && !flags[kC], isTrue);
-      flags.set(kA);
+      flags.set1(kA);
       expect(!flags[k0] && flags[kA] && !flags[kB] && !flags[kC], isTrue);
     });
     test('Set 60..63 radio | should throw', () {
@@ -239,18 +239,18 @@ void main() {
       expect(flags[kA] && flags[kH] && !flags[k0] && !flags[kI], isTrue);
     });
     test('set C E', () {
-      flags.set(kC);
-      flags.set(kE);
+      flags.set1(kC);
+      flags.set1(kE);
       expect(flags[kC] && flags[kE] && !flags[kA] && !flags[kH], isTrue);
     });
     test('set B F', () {
-      flags.set(kB);
-      flags.set(kF);
+      flags.set1(kB);
+      flags.set1(kF);
       expect(flags[kB] && flags[kF] && !flags[kA] && !flags[kH], isTrue);
     });
     test('set D I', () {
-      flags.set(kD);
-      flags.set(kI);
+      flags.set1(kD);
+      flags.set1(kI);
       expect(flags[kA] && flags[kH] && flags[kD] && flags[kI], isTrue);
     });
   });
@@ -436,7 +436,7 @@ void main() {
         oS.hh <<= 1; // test abandon older state
       }
       oS.differsFrom(nS, tgFirst: 11, tgLast: 16); // cover !differs path
-      if (nS[1] && nS.differsFrom(oS)) nS.set(0); // test state fixing on 1
+      if (nS[1] && nS.differsFrom(oS)) nS.set1(0); // test state fixing on 1
       if (nS[7] && nS.differsFrom(oS)) nS.setDone(); // test skip notify on 7
       if (nS[9] && nS.differsFrom(oS)) nS.done = true; // test skip notify on 9
       return true;
@@ -448,31 +448,31 @@ void main() {
       flags.tg = flags.ds = flags.rg = flags.hh = 0; // reset
     });
     test('Notify 0', () {
-      flags.set(0);
+      flags.set1(0);
       expect(flags[0] && !flags[1], isTrue);
       expect(last == 1, isTrue);
     });
     test('Notify 1', () {
-      flags.set(1);
+      flags.set1(1);
       expect(last == 2, isTrue);
       expect(flags[0] && flags[1], isTrue);
     });
     test('Notify via clone', () {
       var nf = flags.clone();
-      nf.set(5);
+      nf.set1(5);
       expect(nf[5] && !flags[5], isTrue);
       expect(last == 3, isTrue);
     });
     test('Internal fix', () {
-      flags.set(7);
+      flags.set1(7);
       expect(last == 3, isTrue); // notify skipped, setDone()
-      flags.set(9);
+      flags.set1(9);
       expect(last == 3, isTrue); // notify skipped, done = true
     });
     test('Make artificial race | should throw', () {
       expect(() {
-        flags.set(25);
-        flags.set(0);
+        flags.set1(25);
+        flags.set1(0);
       }, throwsAssertionError);
     });
     // TODOx Make real racing test to hit `if (hh != newS.hh)` in _ckFix

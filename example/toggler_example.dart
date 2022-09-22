@@ -3,12 +3,12 @@
 import 'package:toggler/toggler.dart';
 
 /// This is a CLI example. Toggler does not depend on Flutter, but is a basis
-/// of UiModel mixin that let bind Flutter widget tree and ViewModel in just
-/// two lines of code per your custom Widget.
+/// of UiModel mixin that let bind Flutter widget tree to Toggler based Models.
+/// Toggler with Flutter example App is in example/flutter_example.dart file.
 
 /// **Always** use symbolic names for Toggler item (bit) index.
-/// You may stub tgNames and smNames using `tool/print_named_indice.dart` script.
-/// `dart run tool/print_named_indice.dart > lib/src/tg_names.dart`
+/// You may stub tgNames and smNames with script:
+///`dart run tool/print_named_indice.dart > lib/src/tg_names.dart`
 const tgName0 = 0;
 const tgNameA = 1;
 const tgNameB = 2;
@@ -62,23 +62,23 @@ void main() {
   flags.radioGroup(tgNameD, tgNameF);
   // fiddle:
   print('Trying to set A (StateFix validator disallows this)');
-  flags.set(tgNameA);
+  flags.set1(tgNameA);
   print('Set 0, NameA can be set only if Name0 was set before');
-  flags.set(tgName0);
+  flags.set1(tgName0);
   print('Now A is allowed to be toggled');
-  flags.set(tgNameA);
+  flags.set1(tgNameA);
   print('Set B');
-  flags.set(tgNameB);
+  flags.set1(tgNameB);
   print('Set C');
-  flags.set(tgNameC);
+  flags.set1(tgNameC);
   print('Set D (of D..F radio group)');
-  flags.set(tgNameD);
+  flags.set1(tgNameD);
   print('Set E of radio D..F - D will clear automatically.');
-  flags.set(tgNameE);
+  flags.set1(tgNameE);
   print('Set F radio. E will clear then B and C are disabled by StateFix');
-  flags.set(tgNameF);
+  flags.set1(tgNameF);
   print('Set D radio. F will clear; then B and C are enabled by StateFix');
-  flags.set(tgNameD);
+  flags.set1(tgNameD);
 }
 
 /// A few extensions are put here to show how Toggler can be tailored for
@@ -111,6 +111,17 @@ extension TogglerRx on Toggler {
     }
     return true;
   }
+}
+
+extension TogglerNums on Toggler {
+  /// returns item at tgIndex state as 0..3 int of b1:ds b0:tg
+  /// for use with `switch`.
+  int numAt(int tgIndex) => (ds >> tgIndex) << 1 | tg >> tgIndex;
+
+  /// Toggler has 8 bits reserved for an extension state, get/set all 8 of them.
+  /// See also [BrandedTogglers].
+  int get numExt => hh.toUnsigned(16) >> 8;
+  set numExt(int tgIndex) => hh = hh & ~0xff00 | tgIndex.toUnsigned(8) << 8;
 }
 
 /// If your UI is based on UiModel mixin, `replay` can be used to "demo play"

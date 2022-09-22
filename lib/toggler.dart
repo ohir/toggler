@@ -103,17 +103,17 @@ class Toggler {
   TogglerStateFixer? fix;
 
   /// All Toggler members are public for easy tests and custom serialization.
-  /// Toggler object with state transition handler (`fix`), or notifiers
-  /// (`after` or `notifier`) is said to be a _live_ one. Otherwise, if all
-  /// handlers are null, it is a _state copy_ object.
+  /// Toggler object with any state transition handler (`fix`, `after`,
+  /// `notifier`) non null is said to be a _live_ one. Otherwise, if all
+  /// handlers are null, it is a _state copy_ object.
   Toggler({
-    this.notifier,
-    this.after,
     this.fix,
+    this.after,
+    this.notifier,
+    this.chb = 0,
     this.tg = 0,
     this.ds = 0,
     this.rg = 0,
-    this.chb = 0,
     this.hh = 0,
   }) {
     rg = rg.toUnsigned(_im); // never copy with done
@@ -329,7 +329,7 @@ class Toggler {
   /// set (_1_, _on_, _true_) item at index _tgIndex_.  By default state changes are
   /// not suppresed, but an optional argument `ifActive: true` mandates prior
   /// _active_ check. Ie. item will be set only if it is active.
-  void set(int tgIndex, {bool ifActive = false}) {
+  void set1(int tgIndex, {bool ifActive = false}) {
     if (ifActive && !active(tgIndex)) return;
     tgIndex = _v(tgIndex);
     int ntg = tg;
@@ -371,7 +371,7 @@ class Toggler {
   /// Ie.  item will change state only if it is active.
   void setTo(int i, bool state, {bool ifActive = false}) {
     if (ifActive && !active(i)) return;
-    state ? set(i) : clear(i);
+    state ? set1(i) : clear(i);
   }
 
   /// get copy of state; _done_ flag and handlers are cleared on the copy.
@@ -390,7 +390,7 @@ class Toggler {
       ntg &= ~(1 << i);
       if (ntg != tg) verto(i, ntg, false, false);
     } else {
-      set(i);
+      set1(i);
     }
   }
 
@@ -413,7 +413,7 @@ class Toggler {
     final oldS = Toggler(tg: tg, ds: ds, rg: rg, hh: hh);
     if (done) oldS.setDone(); // fix and after should know
     final nhh = (((hh.toUnsigned(_bf) >> 16) + 1) << 16) | // serial++
-        ((hh.toUnsigned(16) & 0xff00) | //  b15..b13 reserved, b12..b8: brand
+        ((hh.toUnsigned(16) & 0xff00) | // b15..b8 extensions reserved
             (isDs ? (1 << 7) : 0) | // cabyte b7: tg/ds
             (actSet ? (1 << 6) : 0) | //      b6: clear/set
             i.toUnsigned(6)); //          b5..b0: item index
@@ -476,9 +476,9 @@ abstract class ToggledNotifier {
 
   // @mustBeOverridden
   /// used to get _indexed_ notifiers
-  /// eg. `watchX((ToggledNotifier x) => x.single(tgSendAction);`
+  /// eg. `watch(m.single(tgSendAction);`
   dynamic single(int index) =>
-      throw UnimplementedError('operator [] not implemented');
+      throw UnimplementedError('single(index) not implemented');
 
   /// set _indexed_ notifiers, use "add" only in mocks for test pipelines
   bool addIndexed(int index, dynamic value) => false;
