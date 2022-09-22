@@ -354,8 +354,8 @@ class Toggler {
     if (ntg != tg) verto(tgIndex, ntg, false, true);
   }
 
-  /// sets done, always returns true (for `setDone() ? ... : null ` constructs).
-  bool setDone() => (rg |= 1 << _bf) != 0;
+  /// sets done, always returns true (for `markDone() ? ... : null ` constructs).
+  bool markDone() => (rg |= 1 << _bf) != 0;
 
   /// disable (true) or enable (false) an item at index _tgIndex_.
   ///
@@ -411,7 +411,7 @@ class Toggler {
       return;
     }
     final oldS = Toggler(tg: tg, ds: ds, rg: rg, hh: hh);
-    if (done) oldS.setDone(); // fix and after should know
+    if (done) oldS.markDone(); // fix and after should know
     final nhh = (((hh.toUnsigned(_bf) >> 16) + 1) << 16) | // serial++
         ((hh.toUnsigned(16) & 0xff00) | // b15..b8 extensions reserved
             (isDs ? (1 << 7) : 0) | // cabyte b7: tg/ds

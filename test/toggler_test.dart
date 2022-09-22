@@ -278,7 +278,7 @@ void main() {
       expect(flags.error, isFalse);
       expect(flags.race, isFalse);
       expect(flags.done, isFalse);
-      flags.setDone();
+      flags.markDone();
       expect(flags.done, isTrue);
     });
     test('Demand bad diff| should throw', () {
@@ -315,14 +315,14 @@ void main() {
       expect(flags[5] && flags.hh == ohh, isTrue);
     });
     test('done is cleared with copy', () {
-      flags.setDone();
+      flags.markDone();
       final c1 = flags.state();
       expect(flags != c1, isTrue);
       expect(flags.done, isTrue);
       expect(c1.done, isFalse);
     });
     test('done is cleared with clone', () {
-      flags.setDone();
+      flags.markDone();
       final c1 = flags.clone();
       expect(flags.done, isTrue);
       expect(c1.done, isFalse);
@@ -357,7 +357,7 @@ void main() {
     test('done is cleared on fix only', () {
       flags.after = null;
       expect(flags.done, isFalse);
-      flags.setDone();
+      flags.markDone();
       expect(flags.done, isTrue);
       flags.toggle(5);
       expect(flags.done, isFalse);
@@ -372,7 +372,7 @@ void main() {
     test('done is cleared on notify only', () {
       flags.fix = null;
       expect(flags.done, isFalse);
-      flags.setDone();
+      flags.markDone();
       expect(flags.done, isTrue);
       flags.toggle(5);
       expect(flags.done, isFalse);
@@ -389,7 +389,7 @@ void main() {
       flags.after = null;
       flags.notifier = TCNo();
       expect(flags.done, isFalse);
-      flags.setDone();
+      flags.markDone();
       expect(flags.done, isTrue);
       flags.toggle(5);
       expect(flags.done, isFalse);
@@ -437,7 +437,7 @@ void main() {
       }
       oS.differsFrom(nS, tgFirst: 11, tgLast: 16); // cover !differs path
       if (nS[1] && nS.differsFrom(oS)) nS.set1(0); // test state fixing on 1
-      if (nS[7] && nS.differsFrom(oS)) nS.setDone(); // test skip notify on 7
+      if (nS[7] && nS.differsFrom(oS)) nS.markDone(); // test skip notify on 7
       if (nS[9] && nS.differsFrom(oS)) nS.done = true; // test skip notify on 9
       return true;
     }
