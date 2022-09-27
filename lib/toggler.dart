@@ -461,32 +461,10 @@ typedef TogglerAfterChange = void Function(Toggler oldState, Toggler current);
 // coverage:ignore-start
 /// Toggler's change notification dispatcher, an abstract interface.
 /// Concrete implementation can be found eg. in `package:uimodel/uimodel.dart`
-///
-/// _Note: docs example code below uses `WatchX` of `get_it_mixin` package:
-/// neither `WatchX` is a part of Toggler, nor Toggler depends on get_it_mixin.
-/// See Flutter example for concrete implementation of ToggledNotifier (the
-/// _UiNotifier_ class)._
 abstract class ToggledNotifier {
-  // @mustBeOverridden
+  // @mustBeOverridden  not yet :|
   /// the _chb_ recent changes bitmask is to be pumped here.
   /// Automatically, if an implementation is provided to Toggler _notifier_.
-  void pump(int chb) => throw UnimplementedError('pump not implemented');
-
-  // @mustBeOverridden
-  /// used to get _masked_ notifiers,
-  /// eg. `watch(m(tmDn | tmUp));`
-  dynamic call(int smMask) => throw UnimplementedError('call not implemented');
-
-  // @mustBeOverridden
-  /// used to get _indexed_ notifiers
-  /// eg. `watch(m.single(tgSendAction);`
-  dynamic single(int index) =>
-      throw UnimplementedError('single(index) not implemented');
-
-  /// set _indexed_ notifiers, use "add" only in mocks for test pipelines
-  bool addIndexed(int index, dynamic value) => false;
-
-  /// add _masked_ notifier, use "add" only in mocks for test pipelines
-  bool addMasked(int smMask, dynamic value) => false;
+  void pump(int chb);
 }
 // coverage:ignore-end
