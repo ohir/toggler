@@ -66,7 +66,7 @@ _See example/flutter_example.dart for a complete app code._
 
 ### Example App state flow with Toggler
 
-> Pre: Some property in your Model is mutated, eg. a background service just hinted Model with a new _NameString_. NameString setter then register state change in Model's internal Toggler, eg. by calling `set1(tgName)`. Then Toggler manages the flow:
+> Pre: Some property in your Model is mutated, eg. a background service just hinted Model with a new _NameString_. NameString setter then register state change in Model's internal Toggler, eg. by calling `toggle(tgName)`. Then Toggler manages the flow:
 
 1. `Toggle` setter changes a **single** item (state bit), here one at `tgName` index, this change is put on a `newState` object that is a _state copy_ of the Toggler, but with _tgName_ bit toggled. Second, verbatim _state copy_ is taken as _oldState_, then both are passed to the state transition handler `fix(oldState, newState)`. `Fix` is the "business logic" function provided by you.
 2. `Fix` runs, possibly mutating _newState_ further, eg. setting the _tgNameHintReceived_ flag, and clearing _tgWaitingForNameHint_ one. When new state is properly set, `fix` returns _true_.
