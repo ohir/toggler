@@ -16,7 +16,7 @@ void main() {
     final flags = Toggler();
 
     setUp(() {
-      flags.tg = flags.ds = flags.rg = flags.hh = flags.chb = 0; // reset
+      flags.bits = flags.ds = flags.rg = flags.hh = flags.chb = 0; // reset
       flags.fix = flags.after = null;
     });
 
@@ -33,13 +33,13 @@ void main() {
     test('Is Set in range set boundry', () {
       flags.set1(7);
       flags.set1(12);
-      expect(flags.anyInSet(tgFirst: 7, tgLast: 10), isTrue);
-      expect(flags.anyInSet(tgFirst: 8, tgLast: 12), isTrue);
+      expect(flags.anyOfSet(rangeFirst: 7, rangeLast: 10), isTrue);
+      expect(flags.anyOfSet(rangeFirst: 8, rangeLast: 12), isTrue);
     });
     test('Is Set in range not set boundary', () {
       flags.set1(7);
       flags.set1(12);
-      expect(flags.anyInSet(tgFirst: 8, tgLast: 11), isFalse);
+      expect(flags.anyOfSet(rangeFirst: 8, rangeLast: 11), isFalse);
     });
     test('DisableEnable', () {
       flags.disable(0);
@@ -150,11 +150,12 @@ void main() {
       expect(flags.chb == 1, isTrue);
       flags.set1(10);
       expect(flags.chb == 1024, isTrue);
-      expect(flags.changed(i: 10), isTrue);
-      expect(flags.changed(i: 10, smMask: 7 << 8), isTrue);
-      expect(flags.changed(i: 11, smMask: 7 << 8), isFalse);
-      expect(flags.changed(i: 10, smMask: 7 << 7), isFalse);
-      expect(flags.changed(smMask: 7 << 8), isTrue);
+      expect(flags.changedAt(9), isFalse);
+      expect(flags.changedAt(10), isTrue);
+      expect(flags.changedAt(11), isFalse);
+      expect(flags.changed(1 << 9), isFalse);
+      expect(flags.changed(1 << 10), isTrue);
+      expect(flags.changed(1 << 11), isFalse);
       flags.set1(11);
       flags.set1(33);
       flags.disable(51); // cm must reflect any change at index
@@ -176,8 +177,8 @@ void main() {
       expect(c1.differsFrom(flags), isFalse);
       c1.set1(5);
       expect(c1.differsFrom(flags), isTrue);
-      expect(c1.differsFrom(flags, smMask: 63), isTrue);
-      expect(c1.differsFrom(flags, smMask: 31), isFalse);
+      expect(c1.differsFrom(flags, mask: 63), isTrue);
+      expect(c1.differsFrom(flags, mask: 31), isFalse);
       flags.set1(5);
       expect(c1.differsFrom(flags), isFalse);
       flags.set1(8);
@@ -201,7 +202,7 @@ void main() {
     final flags = Toggler();
 
     setUp(() {
-      flags.tg = flags.ds = flags.rg = flags.hh = 0; // reset
+      flags.bits = flags.ds = flags.rg = flags.hh = 0; // reset
       flags.radioGroup(kA, kC);
       flags.radioGroup(kE, kH);
       flags.set1(kA);
@@ -258,7 +259,7 @@ void main() {
     final flags = Toggler();
 
     setUp(() {
-      flags.tg = flags.ds = flags.rg = flags.hh = 0; // reset
+      flags.bits = flags.ds = flags.rg = flags.hh = 0; // reset
     });
     test('Race/Err/Done set true', () {
       flags.error = true;
@@ -300,7 +301,7 @@ void main() {
     final flags = Toggler();
     const ohh = 7777777777;
     setUp(() {
-      flags.tg = flags.ds = flags.rg = 0;
+      flags.bits = flags.ds = flags.rg = 0;
       flags.hh = ohh;
       flags.fix = chfix;
       flags.after = chnote;
@@ -445,7 +446,7 @@ void main() {
     final flags = Toggler(after: chnote, fix: chfix);
 
     setUp(() {
-      flags.tg = flags.ds = flags.rg = flags.hh = 0; // reset
+      flags.bits = flags.ds = flags.rg = flags.hh = 0; // reset
     });
     test('Notify 0', () {
       flags.set1(0);

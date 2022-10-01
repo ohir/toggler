@@ -95,12 +95,12 @@ extension TogglerRx on Toggler {
     if (!force && hh > src.hh) return false;
     Toggler? oldS;
     if (after != null || notifier != null) oldS = state();
-    tg = src.tg;
+    bits = src.bits;
     ds = src.ds;
     rg = src.rg;
     hh = src.hh;
     if (oldS != null) {
-      chb = (tg ^ oldS.tg) | (ds ^ oldS.ds);
+      chb = (bits ^ oldS.bits) | (ds ^ oldS.ds);
       if (doNotify) {
         if (after != null) {
           after!(oldS, this);
@@ -116,7 +116,7 @@ extension TogglerRx on Toggler {
 extension TogglerNums on Toggler {
   /// returns item at tgIndex state as 0..3 int of b1:ds b0:tg
   /// for use with `switch`.
-  int numAt(int tgIndex) => (ds >> tgIndex) << 1 | tg >> tgIndex;
+  int numAt(int tgIndex) => (ds >> tgIndex) << 1 | bits >> tgIndex;
 
   /// Toggler has 8 bits reserved for an extension state, get/set all 8 of them.
   /// See also [BrandedTogglers].
@@ -147,8 +147,8 @@ extension TogglerReplay on Toggler {
             ? ds |= (1 << i)
             : ds &= ~(1 << i)
         : actS
-            ? tg |= (1 << i)
-            : tg &= ~(1 << i);
+            ? bits |= (1 << i)
+            : bits &= ~(1 << i);
     verto(i, va, isDs, actS);
   }
 }
@@ -161,19 +161,9 @@ extension BrandedTogglers on Toggler {
   /// Then a single common `fix` method may know which one of that many
   /// Togglers changed its state and called it (_fix_). These Togglers usually
   /// are put on a List<Toggler> under _brand_ index.
-  int get brand => hh.toUnsigned(13) >> 8;
-  set brand(int i) => hh = hh & ~0x1f00 | i.toUnsigned(5) << 6;
+  int get brand => hh.toUnsigned(16) >> 8;
+  set brand(int i) => hh = hh & ~0xff00 | i.toUnsigned(8) << 8;
 
   /// returns _true_ if brand of object and brand in _branded index_ match,
-  /// and if resulting index can safely be used in Toggler methods.
-  bool checkBrand(int i) =>
-      i >= 0 && hh & 0x1f00 == i & 0x1f00 && i & 0x3f <= tgIndexMax;
-
-  /// zeroes brand bits of _i_ index so returned int can be used with
-  /// Toggler methods (note that _i_ should always be subject to [checkBrand]
-  /// before clamping: `if (tg.checkBrand(bi)) smth = tg[clampBrand(bi)]`)
-  int clampBrand(int i) => i.toUnsigned(6);
-
-  /// merge this object brand bits into the index
-  int brandIndex(int i) => (hh & 0x1f00) >> 2 | i.toUnsigned(5);
+  bool checkBrand(int i) => hh & 0xff00 == i & 0xff00;
 }

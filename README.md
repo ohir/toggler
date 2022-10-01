@@ -1,20 +1,21 @@
-**Toggler** manages App state booleans: with easy state transitions, pre-commit state validation, and post-commit change notifications.
+**Toggler** is a state machine register able to orchestrate state transitions, validation, and finally to pass notifications of a just commited state change.
 
-**Toggler** object keeps state of up to 52 boolean values (items, flags, bits) that can be manipulated one by one or in concert. _Radio group_ behaviour can be declared on up to 17 separated groups of items. Independent _disabled_ property is avaliable for every item – to be used from within UI builders. If 52 is not enough, Togglers can be used in paralel or even be cascaded.
+**Toggler** instance may keep up to 52 boolean values (named items, flags, bits) that can be manipulated one by one or in concert.
 
-**Toggler** was designed for MVVM and similar newer architectures with unidirectional flow of state changes. It was specifically designed for safe use in singleton _Models_, though it can also be used in _reactive_ state management architectures (it has a `clone` method). Built-in data race detection may automatically skip changes coming from an outdated ancestor state.
+For direct use in ViewModels of _Flutter_ UI **Toggler** provides an independent _disabled_ property for each of state bits and supports "radio grouping" among adjacent two or more of them.
+
+**Toggler** was designed for MVVM and similar newer architectures with unidirectional flow of state changes. It was specifically tailored for safe use in singleton _Models_, guaranteeing that changes coming from an outdated ancestor state will be detected and automatically skipped. Yet it may also be used in _reactive_ state management architectures (it has a `clone` method).
 
 Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (162 of 162 lines)`
+Test coverage: `100.0% (152 of 152 lines)`
 
 ## Getting started
 
 _Note: item, flag, bit (of Toggler) are used interchangeably in docs._
 
- 1. `$> dart pub get toggler` (both for CLI and Flutter)
+ 1. `$> dart pub get toggler` (for CLI)
  1. `$> dart pub get uimodel` (for Flutter GUI binding)
- 1. `$> dart pub get get_it get_it_mixin` (for easy Flutter apps)
  2. import toggler: `import 'package:toggler/toggler.dart';`
  3. declare meaningful names for your flags/items/bits:
  ```Dart
@@ -36,18 +37,13 @@ _Note: item, flag, bit (of Toggler) are used interchangeably in docs._
  ```
 _See toggler_example.dart for Toggler basics (and possible Toggler extensions)._
 
-For _Flutter_ apps use there is a thin wrapper around Toggler called [UiModel](https://pub.dev/packages/uimodel). Together with [get_it_mixin](https://pub.dev/packages/get_it_mixin) they make for a complete state managment of _Flutter_ apps, allowing Models and Views to be wired up just by two lines of code:
+For _Flutter_ apps use there is a thin wrapper around Toggler called [UiModel](https://pub.dev/packages/uimodel) that allow UI Views be wired to a singleton Model (ViewModel) by just single line of code placed in the (_Stateless, not anymore_) Widget build method.
 ```Dart
-// early on you declare your tg/sm names and make a ViewModel:
+// with tg/sm const ints already declared, make a ViewModel:
 class ViewModel with UiModel {...} // now your ViewModel has a Toggler
 //
-void main() {
-  // register your Model as a get_ittable singleton
-  GetIt.I.registerSingleton<ViewModel>(ViewModel());
-  runApp(const MyApp()); // run your App loop
-}
 // (0) wire up View and Model [stage 0 is-a code]
-// ... then in a stateless widget with GetItMixin, stages 1..5 occur:
+// ... then in a "stateless" widget stages 1..5 occur:
 // (1) get your ViewModel object in scope
 // (2) bind to Toggler's change notifications,
 // (3) read and use data from Model
@@ -55,8 +51,8 @@ void main() {
 //     -> Model changes; if fix toggles tgTurn or tgPrize ->
 // (5) rebuild on either smTurn or smPrize change notification
   Widget build(BuildContext context) {
-    final m = get<ViewModel>(); // (1)  Two lines, as promised
-    watch(target: m(smTurn | smPrize)); // (0), (2), (5)
+    final m = ViewModel(); // (1) singleton model with UiModel
+    watches(m, smTurn | smPrize)); // (0), (2), (5)
     // Here View knows M and knows when M changes at Turn or Prize...
       // it can read and use data from Model...
       Text('${m[tgPrize] ? m.prize : 'Try again!'}'), // (3)
@@ -68,17 +64,16 @@ void main() {
 _See example/flutter_example.dart for a complete app code._
 
 
-### Toggler state flow
+### Example App state flow with Toggler
 
-1. Somewhere in your code you call a setter. Eg. `set(tgName)`,
-2. each setter changes state of a **single** item – one at `tgName` index,
-4. a state transition handler `fix(oldState, newState)` runs next mutating _newState_,
-5. then (if `fix` returned _true_) _newState_ is commited - it becomes a _liveState_,
-7. then `after(oldState, liveState)` handler runs. It may decide whether the outer
-world should know about the changes. If so, it may pass baton to the
-1. `notifier` that informs subscribers, if it has any. If there is no `after` handler installed, and `notifier` handler is, it runs automatically on commited changes.
+> Pre: Some property in your Model is mutated, eg. a background service just hinted Model with a new _NameString_. NameString setter then register state change in Model's internal Toggler, eg. by calling `set1(tgName)`. Then Toggler manages the flow:
 
-Your code in `fix` may manipulate _newState_ at will, it even may assign a some predefined const values to the `tg` and/or `ds` properties of it. Usually `fix` is a Model's internal function so it may have access to all other pieces of your business logic (or viewmodel logic).
+1. `Toggle` setter changes a **single** item (state bit), here one at `tgName` index, this change is put on a `newState` object that is a _state copy_ of the Toggler, but with _tgName_ bit toggled. Second, verbatim _state copy_ is taken as _oldState_, then both are passed to the state transition handler `fix(oldState, newState)`. `Fix` is the "business logic" function provided by you.
+2. `Fix` runs, possibly mutating _newState_ further, eg. setting the _tgNameHintReceived_ flag, and clearing _tgWaitingForNameHint_ one. When new state is properly set, `fix` returns _true_.
+3. If `fix` returns true, the _newState_ is commited to the Toggler, ie. it becomes its current (aka _live_) state. This state that outer world sees.
+4. Next, the `after(oldState, liveState)` handler (also provided by you) runs. It may not change anything further, but it may decide whether the outer world should know about the changes. If so, it may pass baton to the
+5. `notifier` object that informs its subscribers, if it has any. If there is no `after` handler installed, and `notifier` handler is, it runs automatically on commited changes.
+6. World is notified, so it may react: the View layer may hide a progress spinner and show an edit field filled with just received _NameString_, background connection to the hint service may close, and so on.
 
 
 ## API 101
@@ -86,13 +81,16 @@ Your code in `fix` may manipulate _newState_ at will, it even may assign a some 
 #### constructors:
 ```Dart
 Toggler({
-  fix? = onChange handler, 
-  after? = afterChange handler,
+  fix? = onChange(oldState, newState) handler, 
+  after? = afterChange(oldState, liveState) handler,
   notifier? = ToggledNotifier()
-  // tg: 0, ds: 0, rm: 0, cm: 0, hh: 0 // internal state is exposed too
+  // bits: 0, ds: 0, rm: 0, rg: 0, chb: 0, hh: 0 // internals are exposed too
 })
 ```
-at least one state cycle handler is needed to make a _live_ Toggler. All other members can be given to default constructor, too - used eg. in saved state deserializer and tests. An all-default Toggler can be mutated at will, eg. in an explicit App state initializer. The `after`, or `notifier`, and/or `fix` handlers can be attached later.
+- at least one state cycle handler is needed to make a _live state_ Toggler. All other members can be given to default constructor, too - used eg. in saved state deserializer and tests. An all-default Toggler can be mutated at will, eg. in an explicit App state initializer. The `after`, or `notifier`, and/or `fix` handlers can be attached later.
+- your code in `fix` may manipulate _newState_ at will, it even may assign a some predefined const values to the `bits` and/or `ds` properties of it. Usually `fix` is a Model's internal function so it may have access to all other pieces of your business logic (and of viewmodel logic).
+- your code in `after` may decide whether `notifier` should run, it may also do notifications by itself. Eg. if your legacy Widget code builds of StreamBuilder, `after` may feed the Stream for it.
+- a `notifier` object usually comes from an associated library, but it can also be yours.
 
 #### factories:
 - `state()` returns a _copy of state_ only (`fix`, `after`, `notifier` null).
@@ -108,15 +106,18 @@ at least one state cycle handler is needed to make a _live_ Toggler. All other m
 - `set1(i, ifActive: true)`, `...` setters may depend on a _disabled_ property.
 
 #### state tests:
+- `chb` property has bits set to 1 at positions that recently changed state
 - `recent` is index of a latest singular change (coming from setter).
 - `serial` is a monotonic state serial number (36b), bigger is newer
 - `isOlderThan(other)` compares serial numbers of state copies.
-- `changed(i?, selmask)` tells if there was a change at _i_ or _selmask_ positions
-- `anyInSet({first, last, selmask})` _true_ if any item is set in range or by selmask
+- `changedAt(i)` tells if there was a change at _i_ index.
+- `changed(selmask)` tells if there was a change on _selmask_ positions
+- `anyOfSet({first, last, selmask})` _true_ if any item is set in range or by selmask
 - `differsFrom(other, {first, last, selmask})` compares this and other state
-- `chb` property has bits set to 1 at positions that recently changed state
 
 #### diagnostics:
+- `v` internally verifies index (as given to any of methods)
+- `vma` internally verifies mask (as given to any of methods)
 - `error` _true_ if in release build Toggler method got a wrong index
 - `race` _true_ if `fix` of older generation tried to update a newer object
 - `done` _true_ if set by your App code. Cleared at every new change.
@@ -126,3 +127,26 @@ at least one state cycle handler is needed to make a _live_ Toggler. All other m
 
 #### serialize:
 Toggler intentionally has no `toString` nor `toJSON` methods. Its whole state is public and consist of just four _ints_. It should be handled seamlesslly by any serialization method one may have chosen for a whole _Model_.
+
+
+## the price tag
+
+Toggler based Models use indice and masks.  Named for the sake of humans, but just numbers to the code. Naming numbers is a one-time chore supported by included const file generator. So, if your App/Model state machine can be represented on up to 52 bits, you're set.
+
+But If 52 is not enough, or you want to work with many submodels there is a caveat: while names will be unique, index numbers an masks will not.
+
+It then may happen that you inadverently pass a name meant for submodel A, to the submodel B, or C. As Toggler code sees only numbers it will act on these not knowing that `const tgPrecise = 7` meant for `Measure` submodel came to the `Storage` submodel where index 7 is a `tgDeleteAll` action flag.
+
+This could be vetted in the base code, but then Toggler core would no longer be simple nor fast. Hence validating and correcting index/mask numbers (per an instance) deliberately were left to the possible subclasses: both index verifier `v` and mask verifier `vma` are public and can be overriden to suit a particular need.
+
+For the practical usage a simpler solution exists that wastes no cpu cycles and works for many submodels as well:
+
+### Toggler naming conventions
+
+1. index name starts with `tg` (togglee)
+2. mask name starts with `sm` (select mask)
+3. then the _ChosenName_ comes (`tgChosenName`, `smChosenName`)
+4. for a single Toggler in use - thats all.
+5. if there are more Toggler based submodels in your Model, each of them and its bits names are given the same two capital letter suffix, eg: `watches(m.toppartBX, smRenamedBX | smSavedBX);`.
+
+_Follow the convention. Then if not you visually at writing, your linter later may spot that the ending of a parameter name does not match the suffix of the name of the receiving object and warn you accordingly_.
