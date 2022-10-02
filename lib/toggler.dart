@@ -130,12 +130,12 @@ class Toggler {
   }
 
   /// _done_ flag can be set on a _live_ Toggler by an outer code. 'Done' always
-  /// is cleared at any state change, ie. right after setter runs.
+  /// is cleared automatically on a state change.
   ///
   /// Both `fix` and `after` handlers may test _oldState_ whether _done_ was
   /// set.  The `fix` handler may also set _done_ on a _newState_ to suppress
-  /// subsequent _after_ and _notifier_ run. (_done_ from `fix` does not make to
-  /// the commited new state).
+  /// subsequent _after_ and _notifier_ run. (_done_ set by `fix` is internal
+  /// only, it does not make to the commited new state).
   ///
   /// In _reactive_ settings _done_ flag can be set on a state clone to mark it
   /// as "being spent". Note that _done_ flag __always__ comes cleared on all new
