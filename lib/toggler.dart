@@ -465,5 +465,8 @@ abstract class ToggledNotifier {
   /// the _chb_ recent changes bitmask is to be pumped here.
   /// Automatically, if an implementation is provided to Toggler _notifier_.
   void pump(int chb);
+
+  /// implementations may inform about how many points observe
+  int get observers => -1;
 }
 // coverage:ignore-end

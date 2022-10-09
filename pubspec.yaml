@@ -1,5 +1,5 @@
 name: toggler
-description: Model of 'togglable items', with support for state transitions and change notifications. Backing Flutter UI with Switches, Checkboxes, Indicators, Buttons, and Radio-Button elements. 
+description: Observable state machine register for Dart and Flutter.
 version: 1.0.0
 homepage: https://github.com/ohir/toggler
 repository: https://github.com/ohir/toggler
