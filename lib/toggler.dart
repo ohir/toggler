@@ -368,6 +368,9 @@ class Toggler {
   /// get copy of state; _done_ flag and handlers are cleared on the copy.
   Toggler state() => Toggler(bits: bits, ds: ds, rg: rg, chb: chb, hh: hh);
 
+  /// unconditionally sends smMask signal via installed notifier
+  void signal(int smMask) => notifier?.pump(smMask);
+
   /// changes item at _tgIndex_ to the opposite state.
   /// Optional argument `ifActive: true` mandates prior _active_ check.
   /// Ie. item will change state only if it is active.
@@ -401,6 +404,10 @@ class Toggler {
   /// Toggler state change engine.  For legitimate use of `verto` see `replay(cas)`
   /// method in examples TogglerReplay extension. (_Verto means 'to turn' in
   /// Latin_).
+  ///
+  /// - nEW is a new bits, ds, or chb content
+  /// - isDs tells that disable state has changed (preserved in cabyte)
+  /// - actSet tells the action (preserved in cabyte)
   void verto(int i, int nEW, bool isDs, bool actSet) {
     if (after == null && notifier == null && fix == null) {
       chb = isDs ? ds ^ nEW : bits ^ nEW;
