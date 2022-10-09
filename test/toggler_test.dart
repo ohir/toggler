@@ -417,17 +417,10 @@ void main() {
       expect(flags.chb == noo.seen, isFalse);
       expect(noo.seen, equals(0));
     });
-    test('notifier must fire on send', () {
-      var noo = TCNo();
-      flags.fix = null;
-      flags.notifier = noo;
-      flags.signal(5);
-      expect(noo.seen, equals(5));
-    });
     test('brand may not change with history', () {
       flags.hh = 0xff << 8;
       flags.toggle(49);
-      flags.toggle(50);
+      flags.signal(50); // use alternate
       flags.toggle(51);
       expect(flags.hh >> 8 == 0x3ff, isTrue);
     });

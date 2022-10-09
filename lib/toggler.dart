@@ -368,8 +368,8 @@ class Toggler {
   /// get copy of state; _done_ flag and handlers are cleared on the copy.
   Toggler state() => Toggler(bits: bits, ds: ds, rg: rg, chb: chb, hh: hh);
 
-  /// unconditionally sends smMask signal via installed notifier
-  void signal(int smMask) => notifier?.pump(smMask);
+  /// toggle item unconditionally to signal some other Model change
+  void signal(int tgIndex) => toggle(tgIndex);
 
   /// changes item at _tgIndex_ to the opposite state.
   /// Optional argument `ifActive: true` mandates prior _active_ check.

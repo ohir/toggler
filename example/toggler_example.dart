@@ -167,3 +167,26 @@ extension BrandedTogglers on Toggler {
   /// returns _true_ if brand of object and brand in _branded index_ match,
   bool checkBrand(int i) => hh & 0xff00 == i & 0xff00;
 }
+
+extension SignalDirect on Toggler {
+  /// sets direct signal limit, flags over that index can be used to direct
+  /// signaling. Note that direct signaling can not be replayed, then neither
+  /// state fixer nor after will run. Ie. bits used for direct signals
+  /// are NOT part of your state machine (nor even they register).
+  void allowDirectSignalsOver(int i) =>
+      hh = hh & ~0xff00 | i.toUnsigned(6) << 8;
+
+  /// pump smMask containing 1s on positions over previously set limit
+  /// directly to the notifier
+  void sigDirect(int smMask) {
+    assert(() {
+      final lim = (hh.toUnsigned(16) >> 8);
+      if (lim == 0 || smMask.toUnsigned(lim) != 0) return false;
+      return true;
+    }(), '''
+  Direct signal mask contains at least one bit that is NOT over the
+  allowDirectSignalsOver(${hh.toUnsigned(16) >> 8}) limit.
+''');
+    notifier?.pump(smMask & ~((1 << (hh.toUnsigned(16) >> 8)) - 1));
+  }
+}
