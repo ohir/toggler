@@ -1,4 +1,4 @@
-**Toggler** is a state machine register able to orchestrate state transitions, validation, and finally to pass notifications of a just commited state change.
+**Toggler** is an observable state machine register. It orchestrates state transitions, validation, and finally it may notify observers of a just commited state change.
 
 **Toggler** instance may keep up to 52 boolean values (bits, flags, items) that can be manipulated one by one or in concert.
 
@@ -8,7 +8,7 @@ For direct use in ViewModels of _Flutter_ UI **Toggler** provides an independent
 
 Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (152 of 152 lines)`
+Test coverage: `100.0% (153 of 153 lines)`
 
 ## Getting started
 

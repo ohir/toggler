@@ -15,7 +15,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (152 of 152 lines)
+/// Test coverage: **100.0%** (153 of 153 lines)
 library toggler;
 
 const _bits = 53; // 53:web 64:noWeb // dart2js int is 53 bit
