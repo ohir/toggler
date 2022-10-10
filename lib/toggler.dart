@@ -15,7 +15,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (153 of 153 lines)
+/// Test coverage: **100.0%** (156 of 156 lines)
 library toggler;
 
 const _bits = 53; // 53:web 64:noWeb // dart2js int is 53 bit
@@ -27,7 +27,7 @@ const _mtm = (1 << _bf) - 1; // mask trimmer
 /// Last usable bit index. While it could be 62, it is now 51 to enable web use.
 /// If you need no web and really need 10 more flags you may use source package
 /// and update `_bits = 53;` to `_bits = 64;`.
-const tgIndexMax = _bits - 2;
+const bIndexMax = _imax;
 
 /// Toggler class keeps state of up to 52 boolean values (bits, items) that can
 /// be manipulated one by one or in concert.
@@ -39,7 +39,7 @@ const tgIndexMax = _bits - 2;
 ///
 /// By convention Toggler const index name has a `tg` (togglee) name prefix,
 /// then respective const bitmask uses `sm` (select mask) prefix. Eg.
-/// `const tgPrize = 33; const smPrize = 1 << tgPrize;`
+/// `const biPrize = 33; const smPrize = 1 << biPrize;`
 ///
 /// _In package's tool/ directory there is a script that generates stub
 /// constants together with their masks, for library user to rename later_.
@@ -67,17 +67,22 @@ class Toggler {
 
   /// history hash keeps `serial` and `recent` values.  Live Toggler updates
   /// `hh` on each state change. State copies have `hh` frozen at values origin
-  /// had at copy creation time.
+  /// had at copy creation time, even if they are being manipulated after.
   ///
   /// Note: Whether `hh` should be serialized and restored depends on App's
-  /// state management architecture used.
+  /// state management architecture used. Keep in mind that MSb of `hh` holds a
+  /// `hold` flag used by time-travelling extensions like _TogglerReplay_ so
+  /// this bit should never be restored to 1. Omit it with
+  /// `hhForStoring = hh.toUnsigned(bIndexMax);`
   int hh;
 
   /// handler `void after(Toggler oldState, Toggler current)`
   /// is called after state change has been _commited_. If not null, it is
-  /// expected to deal also with after-change notifications. Eg. by passing
-  /// current _chb_ to _notifier_ in the very last line:
-  /// `if (current.notifier != null) current.notifier!.pump(current.chb);`
+  /// expected to deal also with after-change notifications. Especially ones
+  /// that do not fit in the uniform `notifier` shape (eg. some Model value can
+  /// be fed to some _Stream_). If `after` is present it is also expected to
+  /// pass current _chb_ to the _notifier_ in the very last line:
+  /// `current.notifier?.pump(current.chb);`
   TogglerAfterChange? after;
 
   /// Concrete implementation of ToggledNotifier class. If given, it will be
@@ -185,27 +190,27 @@ class Toggler {
     return false;
   }
 
-  /// _true_ if Toggler item at _tgIndex_ is enabled (has _ds_ bit 0).
+  /// _true_ if Toggler item at _bIndex_ is enabled (has _ds_ bit 0).
   bool active(int i) => ds & (1 << v(i)) == 0;
 
-  /// _true_ if latest changes happened at _smMask_ set bit positions
-  bool changed(int smMask) => chb & vma(smMask) != 0;
+  /// _true_ if latest changes happened at _sMask_ set bit positions
+  bool changed(int sMask) => chb & vma(sMask) != 0;
 
   /// _true_ if latest changes happened _at_ index
   bool changedAt(int at) => chb & (1 << v(at)) != 0;
 
-  /// clear (to _0_, _off_, _false_ state) item at _tgIndex_.
+  /// clear (to _0_, _off_, _false_ state) item at _bIndex_.
   /// Optional argument `ifActive: true` mandates prior _active_ check.
   /// Ie. item will be cleared only if it is active.
   ///
   /// Note that _clear_ does not know about radio groups by itself
   /// so _clear_ of an active radio member will make all in group being off.
-  void clear(int tgIndex, {bool ifActive = false}) {
-    tgIndex = v(tgIndex);
-    if (ifActive && !active(tgIndex)) return;
+  void clear(int bIndex, {bool ifActive = false}) {
+    bIndex = v(bIndex);
+    if (ifActive && !active(bIndex)) return;
     int ntg = bits;
-    ntg &= ~(1 << tgIndex);
-    if (ntg != bits) verto(tgIndex, ntg, false, false);
+    ntg &= ~(1 << bIndex);
+    if (ntg != bits) verto(bIndex, ntg, false, false);
   }
 
   /// returns a deep copy of the Toggler, including `after`, `notifier`, and
@@ -222,31 +227,31 @@ class Toggler {
 
   /// _true_ if state of `this` and `other` differs. Optionally just at positions
   /// provided with _mask_ (1), or within a given _first..last__ indice
-  /// range. _smMask_ has higher priority than range, so either query with
-  /// _smMask_ or with _first..last_, not both.
+  /// range. _sMask_ has higher priority than range, so either query with
+  /// _sMask_ or with _first..last_, not both.
   ///
   /// Both range and onlyMask allow eg. for ChangeNotifiers be distinct for
   /// different parts of a common to the App Toggler.
   bool differsFrom(Toggler other,
-      {int tgFirst = 0, int tgLast = _imax, int mask = 0}) {
+      {int biFirst = 0, int biLast = _imax, int mask = 0}) {
     if (mask != 0) {
       mask = vma(mask);
       return bits & mask != other.bits & mask || ds & mask != other.ds & mask;
     }
-    tgFirst = v(tgFirst);
-    tgLast = v(tgLast);
-    int p = tgFirst;
-    int n = 1 << tgFirst;
+    biFirst = v(biFirst);
+    biLast = v(biLast);
+    int p = biFirst;
+    int n = 1 << biFirst;
     int d = bits ^ other.bits;
-    while (p < _bf && p <= tgLast) {
+    while (p < _bf && p <= biLast) {
       if (d & n != 0) return true;
       n <<= 1;
       p++;
     }
-    p = tgFirst;
-    n = 1 << tgFirst;
+    p = biFirst;
+    n = 1 << biFirst;
     d = ds ^ other.ds;
-    while (p < _bf && p <= tgLast) {
+    while (p < _bf && p <= biLast) {
       if (d & n != 0) return true;
       n <<= 1;
       p++;
@@ -254,11 +259,11 @@ class Toggler {
     return false;
   }
 
-  /// enable item at _tgIndex_.
-  void enable(int tgIndex) => setDS(tgIndex, false);
+  /// enable item at _bIndex_.
+  void enable(int bIndex) => setDS(bIndex, false);
 
-  /// disable item at _tgIndex_.
-  void disable(int tgIndex) => setDS(tgIndex, true);
+  /// disable item at _bIndex_.
+  void disable(int bIndex) => setDS(bIndex, true);
 
   /// _true_ if other copy has been created after us. A live Toggler object
   /// (one with a non-null _after_ function) can never be older than a copy or
@@ -278,25 +283,25 @@ class Toggler {
   /// 5..7 (gap at 4) are OK but 0..3 and 4..6 are not (no 3 to 4 gap).
   /// Gap index is fully usable for an independent item.
   ///
-  /// Allowed group boundaries are: `0 <= first < last <= tgIndexMax`, if this
+  /// Allowed group boundaries are: `0 <= first < last <= bIndexMax`, if this
   /// condition is not met, or ranges touch or overlap, radioGroup will throw on
   /// debug build, or it will set error flag on _release_ build.
   ///
   /// A radioGroup creation does not `after`. Any number of calls to radioGroup
   /// can be replaced by assigning a predefined constant to the `rm` member.
-  void radioGroup(int tgFirst, int tgLast) {
-    tgFirst = v(tgFirst);
-    tgLast = v(tgLast);
-    assert(tgFirst < tgLast,
+  void radioGroup(int biFirst, int biLast) {
+    biFirst = v(biFirst);
+    biLast = v(biLast);
+    assert(biFirst < biLast,
         'First item for RadioGroup configuration must be less than Last');
     var nrm = rg;
-    var i = tgFirst;
-    var c = 1 << (tgFirst - (i == 0 ? 0 : 1));
+    var i = biFirst;
+    var c = 1 << (biFirst - (i == 0 ? 0 : 1));
     bool overlap() {
       if (rg & c != 0) {
         error = true;
         assert(false,
-            'Radio ranges may NOT overlap nor be adjacent to each other [$tgFirst..$tgLast])');
+            'Radio ranges may NOT overlap nor be adjacent to each other [$biFirst..$biLast])');
         return true;
       }
       return false;
@@ -306,7 +311,7 @@ class Toggler {
     if (i > 0) c <<= 1;
     while (true) {
       if (overlap()) return; // i
-      if (i > tgLast) break;
+      if (i > biLast) break;
       nrm |= c;
       c <<= 1;
       i++;
@@ -314,32 +319,32 @@ class Toggler {
     rg = nrm;
   }
 
-  /// set (_1_, _on_, _true_) item at _tgIndex_.  By default state changes are
+  /// set (_1_, _on_, _true_) item at _bIndex_.  By default state changes are
   /// unconditional, but an optional argument `ifActive: true` mandates prior
   /// _active_ check. Ie. item will be set only if it is active.
-  void set1(int tgIndex, {bool ifActive = false}) {
-    tgIndex = v(tgIndex);
-    if (ifActive && !active(tgIndex)) return;
+  void set1(int bIndex, {bool ifActive = false}) {
+    bIndex = v(bIndex);
+    if (ifActive && !active(bIndex)) return;
     int ntg = bits;
-    if (rg & (1 << tgIndex) != 0) {
+    if (rg & (1 << bIndex) != 0) {
       // clear all in this radio group
-      int k = tgIndex;
-      int n = 1 << tgIndex;
+      int k = bIndex;
+      int n = 1 << bIndex;
       while (k < _bf && rg & n != 0) {
         ntg &= ~n;
         n <<= 1;
         k++;
       }
-      k = tgIndex;
-      n = 1 << tgIndex;
+      k = bIndex;
+      n = 1 << bIndex;
       while (k >= 0 && rg & n != 0) {
         ntg &= ~n;
         n >>= 1;
         k--;
       }
     }
-    ntg |= 1 << tgIndex;
-    if (ntg != bits) verto(tgIndex, ntg, false, true);
+    ntg |= 1 << bIndex;
+    if (ntg != bits) verto(bIndex, ntg, false, true);
   }
 
   /// sets done flag and always returns _true_.
@@ -349,7 +354,7 @@ class Toggler {
   /// that some conditional build completed at an expected path.
   bool markDone() => (rg |= 1 << _bf) != 0;
 
-  /// disable (true) or enable (false) an item at index _tgIndex_.
+  /// disable (true) or enable (false) an item at index _bIndex_.
   ///
   /// Note that _ds_ property has bit set to 1 for _disabled_ items.
   void setDS(int i, bool disable) {
@@ -358,7 +363,7 @@ class Toggler {
     if (nds != ds) verto(i, nds, true, disable);
   }
 
-  /// sets item state at _tgIndex_ to the given _state_ value.
+  /// sets item state at _bIndex_ to the given _state_ value.
   /// Optional argument `ifActive: true` mandates prior _active_ check.
   /// Ie.  item will change state only if it is active.
   void setTo(int i, bool state, {bool ifActive = false}) {
@@ -369,23 +374,23 @@ class Toggler {
   Toggler state() => Toggler(bits: bits, ds: ds, rg: rg, chb: chb, hh: hh);
 
   /// toggle item unconditionally to signal some other Model change
-  void signal(int tgIndex) => toggle(tgIndex);
+  void signal(int bIndex) => toggle(bIndex);
 
-  /// changes item at _tgIndex_ to the opposite state.
+  /// changes item at _bIndex_ to the opposite state.
   /// Optional argument `ifActive: true` mandates prior _active_ check.
   /// Ie. item will change state only if it is active.
   ///
   /// Note that toggle does not know about radio groups by itself
   /// so toggle on a set radio position will make all in group being off.
-  void toggle(int tgIndex, {bool ifActive = false}) {
-    tgIndex = v(tgIndex);
-    if (ifActive && !active(tgIndex)) return;
-    if (bits & (1 << tgIndex) != 0) {
+  void toggle(int bIndex, {bool ifActive = false}) {
+    bIndex = v(bIndex);
+    if (ifActive && !active(bIndex)) return;
+    if (bits & (1 << bIndex) != 0) {
       int ntg = bits;
-      ntg &= ~(1 << tgIndex);
-      if (ntg != bits) verto(tgIndex, ntg, false, false);
+      ntg &= ~(1 << bIndex);
+      if (ntg != bits) verto(bIndex, ntg, false, false);
     } else {
-      set1(tgIndex);
+      set1(bIndex);
     }
   }
 
@@ -401,11 +406,19 @@ class Toggler {
   /// Trim mask. Subclasses may also verify it.
   int vma(int mask, {int trim = _mtm}) => mask & trim;
 
+  /// set semaphore forebading any changes to the live Toggler state.
+  /// To be used in `fix` if it calls Model setters that would subsequently
+  /// register changes at this very Toggler instance.
+  void hold() => hh |= (1 << _bf);
+
+  /// allow changes to the live state (opposite of hold)
+  void release() => hh = hh.toUnsigned(_imax); // 51
+
   /// Toggler state change engine.  For legitimate use of `verto` see `replay(cas)`
   /// method in examples TogglerReplay extension. (_Verto means 'to turn' in
   /// Latin_).
   ///
-  /// - nEW is a new bits, ds, or chb content
+  /// - nEW is a new value for bits or ds
   /// - isDs tells that disable state has changed (preserved in cabyte)
   /// - actSet tells the action (preserved in cabyte)
   void verto(int i, int nEW, bool isDs, bool actSet) {
@@ -414,9 +427,11 @@ class Toggler {
       isDs ? ds = nEW : bits = nEW;
       return;
     }
+    if (hh & (1 << _bf) != 0) return; // we're live but on hold
+
     final oldS = Toggler(bits: bits, ds: ds, rg: rg, hh: hh);
     if (done) oldS.markDone(); // fix and after should know
-    final nhh = (((hh.toUnsigned(_bf) >> 16) + 1) << 16) | // serial++
+    final nhh = (((hh.toUnsigned(_imax) >> 16) + 1) << 16) | // serial++
         ((hh.toUnsigned(16) & 0xff00) | // b15..b8 extensions reserved
             (isDs ? (1 << 7) : 0) | // cabyte b7: tg/ds
             (actSet ? (1 << 6) : 0) | //      b6: clear/set
@@ -437,7 +452,7 @@ class Toggler {
         ds = newS.ds;
         hh = newS.hh;
         rg = newS.rg; // may come with 'done' flag set by fix
-        chb = (bits ^ oldS.bits) | (ds ^ oldS.ds); // set "changed" bits
+        chb = ((bits ^ oldS.bits) | (ds ^ oldS.ds)).toUnsigned(_imax);
       }
     } else {
       hh = nhh;
@@ -453,10 +468,10 @@ class Toggler {
   }
 
   /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
-  bool operator [](int tgIndex) => bits & (1 << v(tgIndex)) != 0;
+  bool operator [](int bIndex) => bits & (1 << v(bIndex)) != 0;
 
-  /// unconditionally set value of item at index _tgIndex_.
-  void operator []=(int tgIndex, bool v) => setTo(tgIndex, v);
+  /// unconditionally set value of item at index _bIndex_.
+  void operator []=(int bIndex, bool v) => setTo(bIndex, v);
 } // class Toggler
 
 /// `fix` function signature

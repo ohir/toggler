@@ -7,15 +7,15 @@ import 'package:toggler/toggler.dart';
 /// Toggler with Flutter example App is in example/flutter_example.dart file.
 
 /// **Always** use symbolic names for Toggler item (bit) index.
-/// You may stub tgNames and smNames with script:
+/// You may stub biNames and smNames with script:
 ///`dart run tool/print_named_indice.dart > lib/src/tg_names.dart`
-const tgName0 = 0;
-const tgNameA = 1;
-const tgNameB = 2;
-const tgNameC = 3;
-const tgNameD = 4;
-const tgNameE = 5;
-const tgNameF = 6;
+const biName0 = 0;
+const biNameA = 1;
+const biNameB = 2;
+const biNameC = 3;
+const biNameD = 4;
+const biNameE = 5;
+const biNameF = 6;
 
 void main() {
   void ourAfterHandler(_, Toggler cu) {
@@ -25,7 +25,7 @@ void main() {
       tg += cu[i] ? ' ^' : ' -';
       ds += cu.active(i) ? ' .' : ' !';
     }
-    print(' tgName:  0 A B C D E F G H I J K L M N O P Q R S T U W V X Y Z');
+    print(' biName:  0 A B C D E F G H I J K L M N O P Q R S T U W V X Y Z');
     print(tg);
     print(ds);
     print('          -----------------------------------------------------');
@@ -36,20 +36,20 @@ void main() {
   // simpler Apps it may implement both.
   bool ourStateFixer(Toggler oS, Toggler nS) {
     // 'NameA' may toggle only if 'Name0' was previously set.
-    if (!oS[tgName0] && oS[tgNameA] != nS[tgNameA]) {
+    if (!oS[biName0] && oS[biNameA] != nS[biNameA]) {
       print('      >>> NameA change supressed by validator');
       return false; // disallow change to 'NameA'
     }
     // fix B,C if F radio was toggled
-    if (oS[tgNameF] != nS[tgNameF]) {
-      if (nS[tgNameF]) {
-        nS.disable(tgNameB);
-        nS.disable(tgNameC);
-        nS.clear(tgNameB);
-        nS.clear(tgNameC);
+    if (oS[biNameF] != nS[biNameF]) {
+      if (nS[biNameF]) {
+        nS.disable(biNameB);
+        nS.disable(biNameC);
+        nS.clear(biNameB);
+        nS.clear(biNameC);
       } else {
-        nS.enable(tgNameB);
-        nS.enable(tgNameC);
+        nS.enable(biNameB);
+        nS.enable(biNameC);
       }
     }
     return true; // accept changes and instruct Toggler to commit new state
@@ -59,26 +59,26 @@ void main() {
   final flags = Toggler(after: ourAfterHandler, fix: ourStateFixer);
 
   // declare a radioGroup, up to 17 groups can be made over 51 items.
-  flags.radioGroup(tgNameD, tgNameF);
+  flags.radioGroup(biNameD, biNameF);
   // fiddle:
   print('Trying to set A (StateFix validator disallows this)');
-  flags.set1(tgNameA);
+  flags.set1(biNameA);
   print('Set 0, NameA can be set only if Name0 was set before');
-  flags.set1(tgName0);
+  flags.set1(biName0);
   print('Now A is allowed to be toggled');
-  flags.set1(tgNameA);
+  flags.set1(biNameA);
   print('Set B');
-  flags.set1(tgNameB);
+  flags.set1(biNameB);
   print('Set C');
-  flags.set1(tgNameC);
+  flags.set1(biNameC);
   print('Set D (of D..F radio group)');
-  flags.set1(tgNameD);
+  flags.set1(biNameD);
   print('Set E of radio D..F - D will clear automatically.');
-  flags.set1(tgNameE);
+  flags.set1(biNameE);
   print('Set F radio. E will clear then B and C are disabled by StateFix');
-  flags.set1(tgNameF);
+  flags.set1(biNameF);
   print('Set D radio. F will clear; then B and C are enabled by StateFix');
-  flags.set1(tgNameD);
+  flags.set1(biNameD);
 }
 
 /// A few extensions are put here to show how Toggler can be tailored for
@@ -114,14 +114,14 @@ extension TogglerRx on Toggler {
 }
 
 extension TogglerNums on Toggler {
-  /// returns item at tgIndex state as 0..3 int of b1:ds b0:tg
+  /// returns item at sIndex state as 0..3 int of b1:ds b0:tg
   /// for use with `switch`.
-  int numAt(int tgIndex) => (ds >> tgIndex) << 1 | bits >> tgIndex;
+  int numAt(int sIndex) => (ds >> sIndex) << 1 | bits >> sIndex;
 
   /// Toggler has 8 bits reserved for an extension state, get/set all 8 of them.
   /// See also [BrandedTogglers].
   int get numExt => hh.toUnsigned(16) >> 8;
-  set numExt(int tgIndex) => hh = hh & ~0xff00 | tgIndex.toUnsigned(8) << 8;
+  set numExt(int sIndex) => hh = hh & ~0xff00 | sIndex.toUnsigned(8) << 8;
 }
 
 /// If your UI is based on UiModel mixin, `replay` can be used to "demo play"
@@ -176,17 +176,17 @@ extension SignalDirect on Toggler {
   void allowDirectSignalsOver(int i) =>
       hh = hh & ~0xff00 | i.toUnsigned(6) << 8;
 
-  /// pump smMask containing 1s on positions over previously set limit
+  /// pump sMask containing 1s on positions over previously set limit
   /// directly to the notifier
-  void sigDirect(int smMask) {
+  void sigDirect(int sMask) {
     assert(() {
       final lim = (hh.toUnsigned(16) >> 8);
-      if (lim == 0 || smMask.toUnsigned(lim) != 0) return false;
+      if (lim == 0 || sMask.toUnsigned(lim) != 0) return false;
       return true;
     }(), '''
   Direct signal mask contains at least one bit that is NOT over the
   allowDirectSignalsOver(${hh.toUnsigned(16) >> 8}) limit.
 ''');
-    notifier?.pump(smMask & ~((1 << (hh.toUnsigned(16) >> 8)) - 1));
+    notifier?.pump(sMask & ~((1 << (hh.toUnsigned(16) >> 8)) - 1));
   }
 }
