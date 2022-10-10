@@ -58,8 +58,8 @@ class Toggler {
 
   /// recently changed at 0..51 (bits): 1:at this bit index.
   ///
-  /// changed bits indicator tells indice of all state changes, both in _tg_ and
-  /// in _ds_.  At `fix` call _newState.chb_ will have only one bit set, for use
+  /// changed bits indicator tells indice of all state changes, both in _bits_
+  /// and _ds_.  At `fix` call _newState.chb_ will have only one bit set, for use
   /// in `fix` code, then after `fix` _chb_ will be updated to reflect **all**
   /// changed indice, including ones changed by `fix`. Use _changed_ method to
   /// access _chb_ in a readable way.
@@ -72,8 +72,8 @@ class Toggler {
   /// Note: Whether `hh` should be serialized and restored depends on App's
   /// state management architecture used. Keep in mind that MSb of `hh` holds a
   /// `hold` flag used by time-travelling extensions like _TogglerReplay_ so
-  /// this bit should never be restored to 1. Omit it with
-  /// `hhForStoring = hh.toUnsigned(bIndexMax);`
+  /// this bit should never be restored to 1. Omit it with eg.
+  /// `ntog.hh = stored.hh.toUnsigned(bIndexMax);`
   int hh;
 
   /// handler `void after(Toggler oldState, Toggler current)`
@@ -411,14 +411,14 @@ class Toggler {
   /// register changes at this very Toggler instance.
   void hold() => hh |= (1 << _bf);
 
-  /// allow changes to the live state (opposite of hold)
-  void release() => hh = hh.toUnsigned(_imax); // 51
+  /// now allow changes to the live state (opposite of `hold()`)
+  void resume() => hh = hh.toUnsigned(_imax); // 51
 
   /// Toggler state change engine.  For legitimate use of `verto` see `replay(cas)`
   /// method in examples TogglerReplay extension. (_Verto means 'to turn' in
   /// Latin_).
   ///
-  /// - nEW is a new value for bits or ds
+  /// - nEW is a new value for `bits` or `ds`
   /// - isDs tells that disable state has changed (preserved in cabyte)
   /// - actSet tells the action (preserved in cabyte)
   void verto(int i, int nEW, bool isDs, bool actSet) {

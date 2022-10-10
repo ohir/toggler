@@ -432,7 +432,7 @@ void main() {
       flags.set1(5);
       expect(flags.bits, equals(0));
       expect(noo.seen, equals(0));
-      flags.release();
+      flags.resume();
       flags.toggle(5);
       expect(flags.chb == noo.seen, isTrue);
       expect(noo.seen, equals(1 << 5));

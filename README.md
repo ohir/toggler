@@ -2,7 +2,7 @@
 
 **Toggler** instance may keep up to 52 boolean values (bits, flags, items) that can be manipulated one by one or in concert.
 
-For direct use in ViewModels of _Flutter_ UI **Toggler** provides an independent _disabled_ property for each of state bits and supports "radio grouping" among adjacent two or more of them.
+For direct use in ViewModels of _Flutter_ UI **Toggler** provides an independent _disabled_ property for each of state register bits and supports "radio grouping" among adjacent two or more of them.
 
 **Toggler** was designed for MVVM and similar newer architectures with unidirectional flow of state changes. It was specifically tailored for safe use in singleton _Models_, guaranteeing that changes coming from an outdated ancestor state will be detected and automatically skipped. Yet it may also be used in _reactive_ state management architectures, having the `clone` method.
 
@@ -159,5 +159,5 @@ _Follow the convention. Then if not you visually at writing, your linter later m
 
 ### traps and remedies
 
-- Handler methods may not (should not) `await`. Eg. push changes to a _Stream_ instead.
+- Handler methods may not (should not) even transitively `await`. To interface with asyc code you may eg. push changes to a _Stream_ instead.
 - While fixing state you must either avoid calling your Model setters that would subsequently register in this very Toggler (effecting in an internal race, or worse: a loop). If you can't avoid it, you should get the live object on `hold` before such mutation then `release` it after (at last before returning from `fix`).
