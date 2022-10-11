@@ -159,5 +159,6 @@ _Follow the convention. Then if not you visually at writing, your linter later m
 
 ### traps and remedies
 
-- Handler methods may not (should not) even transitively `await`. To interface with asyc code you may eg. push changes to a _Stream_ instead.
-- While fixing state you must either avoid calling your Model setters that would subsequently register in this very Toggler (effecting in an internal race, or worse: a loop). If you can't avoid it, you should get the live object on `hold` before such mutation then `release` it after (at last before returning from `fix`).
+- This library is synchronous so your handler methods must complete fast. Any interface with async code should be done via a proper state cycle and in a separate Isolate.
+
+- While fixing state you must either avoid calling your Model setters that would subsequently register in this very Toggler (effecting in an internal race, or worse: a loop). If you can't avoid it, you should get the live object on `hold` before such mutation then `resume` it after (at last before returning from `fix`).
