@@ -40,6 +40,14 @@ void main() {
       flags.set1(12);
       expect(flags.anyOfSet(rangeFirst: 8, rangeLast: 11), isFalse);
     });
+    test('fixDs fixBits may not register change', () {
+      flags.fixDs(1, true);
+      expect(flags.active(1), isFalse);
+      expect(flags.chb, equals(0));
+      flags.fixBits(1, true);
+      expect(flags[1], isTrue);
+      expect(flags.chb, equals(0));
+    });
     test('DisableEnable', () {
       flags.disable(0);
       expect(flags.active(0), isFalse);
@@ -260,23 +268,18 @@ void main() {
     setUp(() {
       flags.bits = flags.hh = flags.ds = flags.rg = flags.chb = 0;
     });
-    test('Race/Err/Done set true', () {
+    test('Err/Done set true', () {
       flags.error = true;
-      flags.race = true;
       flags.done = true;
       expect(flags.error, isTrue);
-      expect(flags.race, isTrue);
       expect(flags.done, isTrue);
     });
-    test('Race/Err/Done set false', () {
+    test('Err/Done set false', () {
       flags.error = true;
-      flags.race = true;
       flags.done = true;
       flags.error = false;
-      flags.race = false;
       flags.done = false;
       expect(flags.error, isFalse);
-      expect(flags.race, isFalse);
       expect(flags.done, isFalse);
       flags.markDone();
       expect(flags.done, isTrue);

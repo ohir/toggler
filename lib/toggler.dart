@@ -4,8 +4,6 @@
 /// Models and ViewModels of **MVVM** and similar architectures.  While it was
 /// designed for use in singleton aka "ambient" Models, it also may support
 /// _reactive_ architectures via its `state` and `clone` copying constructors.
-/// For safe use as a singleton Toggler has built-in data race detection and
-/// automatic abandon of an outdated change.
 ///
 /// Toggler supports pre-commit state validation and mutation. After any single
 /// change it first fires `fix` state transition handler, then commits new state
@@ -15,7 +13,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (156 of 156 lines)
+/// Test coverage: **100.0%** (166 of 166 lines)
 library toggler;
 
 const _bits = 53; // 53:web 64:noWeb // dart2js int is 53 bit
@@ -148,29 +146,23 @@ class Toggler {
   bool get done => rg & 1 << _bf != 0;
   set done(bool e) => e ? rg |= 1 << _bf : rg = rg.toUnsigned(_imax);
 
-  /// Error flag is set if index was not in 0.._imax range, or if data race occured.
+  /// Error flag is set if index was not in 0.._imax range.
   ///
   /// In release code it is prudent to check error sparsely, eg. on leaving
   /// a route (if error happened it means your tests are broken: as in debug
-  /// builds an assertion should threw right after setting _error_ or _race_.
+  /// builds an assertion should threw right after setting _error_.
   bool get error => bits & 1 << _bf != 0;
   set error(bool e) => e ? bits |= 1 << _bf : bits = bits.toUnsigned(_imax);
 
-  /// diagnostics flag set internally if Toggler live object was modified while
-  /// `fix` has been doing changes based on an older state.
-  ///
-  /// If such a race occurs, changes based on older state are **not** applied
-  /// (are lost).  Races should not happen with _fix_ calling only sync code,
-  /// but may happen if fix awaited for something slow (it certainly should not
-  /// do).
-  bool get race => ds & 1 << _bf != 0;
-  set race(bool e) => e ? ds |= 1 << _bf : ds = ds.toUnsigned(_imax);
-
   /// index of the most recent single change coming from a state setter
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
   int get recent => hh.toUnsigned(6);
 
   /// monotonic counter increased on each state change. In _state copies_
   /// `serial` is frozen at value origin had at copy creation time.
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
   int get serial => hh.toUnsigned(_bf) >> 16;
 
   // /* methods */ /////////////////////////////////////////////////////////////
@@ -191,12 +183,18 @@ class Toggler {
   }
 
   /// _true_ if Toggler item at _bIndex_ is enabled (has _ds_ bit 0).
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
   bool active(int i) => ds & (1 << v(i)) == 0;
 
   /// _true_ if latest changes happened at _sMask_ set bit positions
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
   bool changed(int sMask) => chb & vma(sMask) != 0;
 
   /// _true_ if latest changes happened _at_ index
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
   bool changedAt(int at) => chb & (1 << v(at)) != 0;
 
   /// clear (to _0_, _off_, _false_ state) item at _bIndex_.
@@ -352,6 +350,8 @@ class Toggler {
   /// True-always return allows to mark ViewModel on the Flutter Widget _build_
   /// using `markDone() ? object : null,` constructs.  Eg. to notify yourself
   /// that some conditional build completed at an expected path.
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
   bool markDone() => (rg |= 1 << _bf) != 0;
 
   /// disable (true) or enable (false) an item at index _bIndex_.
@@ -404,14 +404,20 @@ class Toggler {
   }
 
   /// Trim mask. Subclasses may also verify it.
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
   int vma(int mask, {int trim = _mtm}) => mask & trim;
 
   /// set semaphore forebading any changes to the live Toggler state.
   /// To be used in `fix` if it calls Model setters that would subsequently
   /// register changes at this very Toggler instance.
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
   void hold() => hh |= (1 << _bf);
 
   /// now allow changes to the live state (opposite of `hold()`)
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
   void resume() => hh = hh.toUnsigned(_imax); // 51
 
   /// Toggler state change engine.  For legitimate use of `verto` see `replay(cas)`
@@ -427,33 +433,29 @@ class Toggler {
       isDs ? ds = nEW : bits = nEW;
       return;
     }
-    if (hh & (1 << _bf) != 0) return; // we're live but on hold
+    if (hh & (1 << _bf) != 0) return; // live but on hold
 
     final oldS = Toggler(bits: bits, ds: ds, rg: rg, hh: hh);
     if (done) oldS.markDone(); // fix and after should know
     final nhh = (((hh.toUnsigned(_imax) >> 16) + 1) << 16) | // serial++
-        ((hh.toUnsigned(16) & 0xff00) | // b15..b8 extensions reserved
-            (isDs ? (1 << 7) : 0) | // cabyte b7: tg/ds
-            (actSet ? (1 << 6) : 0) | //      b6: clear/set
-            i.toUnsigned(6)); //          b5..b0: item index
+        ((hh.toUnsigned(16) & 0xff00) | //  b15..b8: extensions reserved
+            (isDs ? (1 << 7) : 0) | //    cabyte b7: tg/ds
+            (actSet ? (1 << 6) : 0) | //         b6: clear/set
+            i.toUnsigned(6)); //             b5..b0: item index
     if (fix != null) {
       final newS = Toggler(
           bits: isDs ? bits : nEW, ds: isDs ? nEW : ds, rg: rg, hh: nhh);
       newS.chb = isDs ? ds ^ nEW : bits ^ nEW; // pass coming single change bit
+      hold(); // user's fix may call chain of setters that might also register
       if (fix!(oldS, newS)) {
-        if (hh != oldS.hh) {
-          ds |= 1 << _bf;
-          error = true;
-          assert(hh == oldS.hh,
-              'Data race detected on state update! [cabyte: ${hh.toUnsigned(8)}]');
-          return;
-        }
+        assert(hh.toUnsigned(_imax) == oldS.hh, 'State data race detected!');
         bits = newS.bits;
         ds = newS.ds;
         hh = newS.hh;
         rg = newS.rg; // may come with 'done' flag set by fix
         chb = ((bits ^ oldS.bits) | (ds ^ oldS.ds)).toUnsigned(_imax);
       }
+      resume();
     } else {
       hh = nhh;
       rg = rg.toUnsigned(_imax);
@@ -467,11 +469,28 @@ class Toggler {
     }
   }
 
+  /// not registering setter for disable bits, for use from user `fix` code
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
+  void fixDs(int bIndex, bool to) =>
+      to ? ds |= (1 << bIndex) : ds &= ~(1 << bIndex);
+
+  /// not registering setter for state bits, for use from user `fix` code
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
+  void fixBits(int bIndex, bool to) =>
+      to ? bits |= (1 << bIndex) : bits &= ~(1 << bIndex);
+
   /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
   bool operator [](int bIndex) => bits & (1 << v(bIndex)) != 0;
 
   /// unconditionally set value of item at index _bIndex_.
   void operator []=(int bIndex, bool v) => setTo(bIndex, v);
+
+  // bool get rsv => ds & 1 << _bf != 0;
+  // set rsv(bool e) => e ? ds |= 1 << _bf : ds = ds.toUnsigned(_imax);
 } // class Toggler
 
 /// `fix` function signature

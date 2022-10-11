@@ -8,7 +8,7 @@ For direct use in ViewModels of _Flutter_ UI **Toggler** provides an independent
 
 Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (156 of 156 lines)`
+Test coverage: `100.0% (166 of 166 lines)`
 
 ## Getting started
 
@@ -107,9 +107,11 @@ Toggler({
 
 #### setters:
 - `[i]=` sets state of item at index i
+- `toggle(i)`, `signal(i)` flip state of item at index i
 - `set1(i)`, `clear(i)`, `setTo(i, state)` change a single item value at `i` index
-- `enable(i)`, `disable(i)`, `setDS(i, state)` mutate _disabled_ property of an item.
-- `set1(i, ifActive: true)`, `...` setters may depend on a _disabled_ property.
+- `enable(i)`, `disable(i)`, `setDS(i, state)` mutate _disabled_ property of an item
+- `set1(i, ifActive: true)`, `...` setters may depend on a _disabled_ property
+- `fixBits(bIndex, value)`, `fixDs(bIndex, value)` non-registering setters (for fix)
 
 #### state tests:
 - `chb` property has bits set to 1 at positions that recently changed state
@@ -125,7 +127,6 @@ Toggler({
 - `v` internally verifies index (as given to any of methods)
 - `vma` internally verifies mask (as given to any of methods)
 - `error` _true_ if in release build Toggler method got a wrong index
-- `race` _true_ if `fix` of older generation tried to update a newer object
 - `done` _true_ if set by your App code. Cleared at every new change.
 
 #### radio group setup:
@@ -159,6 +160,6 @@ _Follow the convention. Then if not you visually at writing, your linter later m
 
 ### traps and remedies
 
-- This library is synchronous so your handler methods must complete fast. Any interface with async code should be done via a proper state cycle and in a separate Isolate.
+- This library is synchronous so your handler methods should complete fast. Any interface with async code should be done via a proper state cycle (eg. in a separate Isolate). Ie. while your async code may easily register in Toggler, you may pass any changes back only using a `notifier`.
 
-- While fixing state you must either avoid calling your Model setters that would subsequently register in this very Toggler (effecting in an internal race, or worse: a loop). If you can't avoid it, you should get the live object on `hold` before such mutation then `resume` it after (at last before returning from `fix`).
+- While `fix` runs the live Toggler state is on [hold]. It means that any further changes to the register are **silently dropped**. If your `fix` mutates external to Toggler data that would register a change from their setter, `fix` must do it for them internally. The `fixBits(bIndex, value)` and `fixDs(bIndex, value)` methods are meant just for that.
