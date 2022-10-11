@@ -35,7 +35,7 @@ const bIndexMax = _imax;
 /// groups of items.  Each state bit value can be retrieved and set using
 /// index[] operator, usually with a constant symbolic name.
 ///
-/// By convention Toggler const index name has a `tg` (togglee) name prefix,
+/// By convention Toggler const index name has a `bi` (bit index) name prefix,
 /// then respective const bitmask uses `sm` (select mask) prefix. Eg.
 /// `const biPrize = 33; const smPrize = 1 << biPrize;`
 ///
