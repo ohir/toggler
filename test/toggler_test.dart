@@ -41,7 +41,7 @@ void main() {
       expect(flags.anyOfSet(rangeFirst: 8, rangeLast: 11), isFalse);
     });
     test('fixDs fixBits may not register change', () {
-      flags.fixDs(1, true);
+      flags.fixDS(1, true);
       expect(flags.active(1), isFalse);
       expect(flags.chb, equals(0));
       flags.fixBits(1, true);

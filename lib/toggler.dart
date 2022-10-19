@@ -472,7 +472,7 @@ class Toggler {
   /// not registering setter for disable bits, for use from user `fix` code
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
-  void fixDs(int bIndex, bool to) =>
+  void fixDS(int bIndex, bool to) =>
       to ? ds |= (1 << bIndex) : ds &= ~(1 << bIndex);
 
   /// not registering setter for state bits, for use from user `fix` code
