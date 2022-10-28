@@ -509,5 +509,8 @@ abstract class ToggledNotifier {
 
   /// implementations may inform about how many points observe
   int get observers => -1;
+
+  /// cleanup code should go to `detach`
+  void detach() {}
 }
 // coverage:ignore-end
