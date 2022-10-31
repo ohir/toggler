@@ -433,9 +433,6 @@ class Toggler {
       isDs ? ds = nEW : bits = nEW;
       return;
     }
-    // TODOlater CONSIDER allowing newS changes on the fix Go
-    // ie. if live on hold single changes should register straight
-    // to the newS.
     if (hh & (1 << _bf) != 0) return; // live but on hold
 
     final oldS = Toggler(bits: bits, ds: ds, rg: rg, hh: hh);
