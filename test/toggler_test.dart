@@ -11,6 +11,21 @@ class TCNo extends ToggledNotifier {
   void pump(int chb) => seen = chb;
 }
 
+/// toggles on setting val to > 10, otherwise signals
+class Model {
+  Toggler msr;
+  final int sigAt;
+  int _v = -1;
+  Model(this.sigAt, this.msr);
+  sig(int at) => msr.signal(at);
+  tap(int at) => msr.toggle(at);
+  int get val => _v;
+  set val(int v) {
+    _v = v;
+    v > 10 ? msr.toggle(sigAt) : msr.signal(sigAt);
+  }
+}
+
 void main() {
   group('Rudimentary :: ', () {
     final flags = Toggler();
@@ -177,7 +192,7 @@ void main() {
 
       flags.fix = cf;
       flags.set1(0);
-      expect(flags.chb == 7, isTrue); // b0,b1,b2 changed
+      expect(flags.chb, equals(7)); // b0,b1,b2 changed
     });
     test('Differs', () {
       var c1 = flags.state();
@@ -422,11 +437,12 @@ void main() {
     test('brand may not change with history', () {
       flags.hh = 0xff << 8;
       flags.toggle(49);
-      flags.signal(50); // use alternate
+      flags.tapTg(50); // use alternate
       flags.toggle(51);
       expect(flags.hh >> 8 == 0x3ff, isTrue);
     });
     test('live state on hold may never change', () {
+      final flags = Toggler();
       expect(flags.fixed, isTrue);
       flags.fix = null;
       flags.after = null;
@@ -434,15 +450,107 @@ void main() {
       flags.notifier = noo;
       flags.hold();
       flags.set1(5);
-      expect(flags.bits, equals(0));
       expect(noo.seen, equals(0));
+      expect(flags.bits, equals(0));
       flags.resume();
       flags.toggle(5);
+      expect(flags.fixed, isTrue);
       expect(flags.chb == noo.seen, isTrue);
       expect(noo.seen, equals(1 << 5));
     });
     /*
     */
+  });
+  group('Signalling :: ', () {
+    late Toggler flags;
+    late Model m0;
+    late Model m1;
+    late Model m2;
+    int last = 0;
+    int fixes = 0;
+    void chnote(Toggler oS, Toggler cS) => last++;
+
+    bool chfix(Toggler oS, Toggler nS) {
+      fixes++;
+      return true;
+    }
+
+    setUp(() {
+      flags = Toggler(after: chnote, fix: chfix); // make anew
+      m0 = Model(0, flags);
+      m1 = Model(1, flags);
+      m2 = Model(2, flags);
+    });
+    test('Simple Signals', () {
+      m0.val = 2;
+      expect(flags.chb, equals(1));
+      expect(fixes, equals(1));
+      m1.val = 3;
+      expect(flags.chb, equals(2));
+      m2.val = 1;
+      expect(flags.chb, equals(4));
+    });
+    test('set value on fix throws', () {
+      bool cf(Toggler oS, Toggler nS) {
+        expect(oS.recChangeMask, equals(1));
+        expect(flags.recSignalsMask, equals(1));
+        m1.val = 1;
+        expect(oS.recChangeMask, equals(3));
+        expect(flags.recSignalsMask, equals(3));
+        m2.val = 11;
+        expect(oS.recChangeMask, equals(7));
+        expect(flags.recSignalsMask, equals(7));
+        return true;
+      }
+
+      flags.fix = cf;
+      expect(() => m0.val = 2, throwsAssertionError);
+    });
+
+    test('outer signal makes to us', () {
+      int fixes = 0;
+      bool cf(Toggler oS, Toggler nS) {
+        expect(oS.recChangeMask, equals(1));
+        expect(flags.recSignalsMask, equals(1));
+        m1.val = 1;
+        expect(oS.recChangeMask, equals(3));
+        expect(flags.recSignalsMask, equals(3));
+        m2.val = 2;
+        expect(oS.recChangeMask, equals(7));
+        expect(flags.recSignalsMask, equals(7));
+        fixes++;
+        return true;
+      }
+
+      flags.fix = cf;
+
+      m0.val = 2;
+      expect(fixes, equals(1));
+      expect(flags.chb, equals(7));
+    });
+
+    test('clearSignal mask works', () {
+      int fixes = 0;
+      bool cf(Toggler oS, Toggler nS) {
+        expect(oS.recChangeMask, equals(1));
+        expect(flags.recSignalsMask, equals(1));
+        m1.val = 1;
+        expect(oS.recChangeMask, equals(3));
+        expect(flags.recSignalsMask, equals(3));
+        m2.val = 2;
+        expect(oS.recChangeMask, equals(7));
+        expect(flags.recSignalsMask, equals(7));
+        oS.clearSignal(1);
+        fixes++;
+        return true;
+      }
+
+      flags.fix = cf;
+
+      m0.val = 2;
+      expect(fixes, equals(1));
+      expect(flags.chb, equals(5)); // 1 masked
+    });
   });
 
   group('FixNotifyRaces :: ', () {

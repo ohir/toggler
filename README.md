@@ -8,7 +8,7 @@ For direct use in ViewModels of _Flutter_ UI **Toggler** provides an independent
 
 Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (166 of 166 lines)`
+Test coverage: `100.0% (193 of 193 lines)`
 
 ## Getting started
 
