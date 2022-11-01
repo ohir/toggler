@@ -110,7 +110,8 @@ class Toggler {
   /// instance reflects.
   ///
   /// _Fix_ fires either on a direct change request (ie. set1, clear, toggle),
-  /// or on a _signal_ called by a reflected entity.
+  /// or on a _signal_ called by a reflected entity.  Direct changes to the
+  /// _live_ state may not happen during the `fix` run, signals may.
   ///
   /// At `fix` call:
   /// - _oldState_ and _newState_ are state copies of the _live_ object, except for:
@@ -119,18 +120,17 @@ class Toggler {
   /// - `chb` fields of _old_ and _new_ always differ. Old reflects a _signal_,
   /// if any came. New reflects a direct change, if any came. Ie one will have
   /// a 1 set at the index of change, the other will be all 0s.
-  /// - If `fix` manipulates external entities that _signal_ back, such signal
+  /// If `fix` manipulates external entities that _signal_ back, such signal
   /// will be reflected on _oldState.chb_ immediately, ie. can be tested during
   /// a `fix` run.  On a state commit later, both old and new `chb` are merged
-  /// (ORed).  Ie. _live_ `chb` will reflect indice of all changes made during
-  /// the most recent `fix` run.
-  /// - Direct changes to the _live_ state may not happen during the `fix` run,
-  /// signals may.
+  /// (ORed) so _live_ `chb` will reflect indice of all changes that were made
+  /// during the most recent `fix` run.
   ///
   /// On `fix` _true_ return, _newState_ will be commited, ie. copied to the
   /// live Toggler object in a single run.  Then either `notifier` will be
   /// _pumped_ with changes, or `after` part will run. If either is present and
-  /// unless supressed.
+  /// unless supressed.  If `fix` returns _false_ changes to the state register
+  /// are abandoned.
   ///
   /// A `fix` code may suppress subsequent `notifier` or `after` call by setting
   /// _done_ flag on a _newState_. This internal _done_ state is not copied to
