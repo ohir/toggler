@@ -23,7 +23,7 @@ const _bf = _bits - 1; //
 /// (51) item max index bit
 const _imax = _bits - 2; //
 /// selects all state bits 0..51, a sMask trimmer
-const _mtm = (1 << _bf) - 1; //
+const _mSBi = (1 << _bf) - 1; //
 
 /// Last usable bit index. While it could be 62, it is now 51 to enable web use.
 /// If you need no web and really need 10 more flags you may use source package
@@ -158,10 +158,10 @@ class Toggler {
     this.hh = 0,
   }) {
     // clear internal flags, if set
-    rg &= _mtm; // done
-    hh &= _mtm;
-    ds &= _mtm;
-    bits &= _mtm; // error
+    rg &= _mSBi; // done
+    hh &= _mSBi;
+    ds &= _mSBi; // hold
+    bits &= _mSBi; // error
   }
 
   /// _done_ flag can be set on a _live_ Toggler by an outer code. 'Done' always
@@ -437,28 +437,29 @@ class Toggler {
   /// Trim mask. Subclasses may also verify it.
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
-  int vma(int mask, {int trim = _mtm}) => mask & trim;
+  int vma(int mask, {int trim = _mSBi}) => mask & trim;
 
-  Toggler? _hold;
+  Toggler? _oldS;
 
-  /// set semaphore forebading any changes to the live Toggler state.
-  /// To be used in `fix` if it calls Model setters that would subsequently
-  /// register changes at this very Toggler instance.
+  /// true if state stabilized, false on the fix run
+  bool get fixed => _oldS == null;
+
+  /// set semaphore forebading any changes to the live state.
+  /// Not to be called in `fix` or `after`;
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
   void hold() {
-    assert(_hold is! Toggler, 'hold called during the `fix` run');
-    assert(_hold == null, 'hold called on an already held Toggler');
-    _hold ??= _dummy() as Toggler;
+    assert(_oldS == null, 'hold called during the `fix` run');
+    ds |= 1 << _bf;
   }
 
-  /// now allow changes to the live state (opposite of `hold()`)
+  /// Release `hold` semaphore and now allow changes to the live state.
+  /// Not to be called in `fix` or `after`;
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
   void resume() {
-    assert(
-        _hold == null || _hold is _dummy, 'resume called during the `fix` run');
-    _hold = null;
+    assert(_oldS == null, 'resume called during the `fix` run');
+    ds &= _mSBi;
   }
 
   /// Toggler state change engine.  For legitimate use of `verto` see `replay(cas)`
@@ -468,17 +469,22 @@ class Toggler {
   /// - nEW is a new value for `bits` or `ds`
   /// - isDs tells that disable state has changed (preserved in cabyte)
   /// - actSet tells the action (preserved in cabyte)
-  void verto(int i, int nEW, bool isDs, bool actSet) {
+  void verto(int i, int nEW, bool isDs, bool actSet, {int sigm = 0}) {
     if (after == null && notifier == null && fix == null) {
+      if (sigm != 0) return; // signal is meaningless on copy
       chb = isDs ? ds ^ nEW : bits ^ nEW;
       isDs ? ds = nEW : bits = nEW;
       return;
     }
-    if (_hold != null) return; // live but on hold
+    if (_oldS != null) {
+      if (sigm == 0) return; // only signals allowed on fix run
+      _oldS!.chb |= sigm;
+      return;
+    }
+    if (ds & 1 << _bf != 0) return; // live but on hold
 
-    final oldS = state(); //Toggler(bits: bits, ds: ds, rg: rg, hh: hh);
-    _hold = oldS; // hold
-    if (done) oldS.markDone(); // fix and after should know
+    _oldS = state(); //Toggler(bits: bits, ds: ds, rg: rg, hh: hh);
+    if (done) _oldS!.markDone(); // fix and after should know
     final nhh = (((hh.toUnsigned(_imax) >> 16) + 1) << 16) | // serial++
         ((hh.toUnsigned(16) & 0xff00) | //  b15..b8: extensions reserved
             (isDs ? (1 << 7) : 0) | //    cabyte b7: tg/ds
@@ -488,14 +494,14 @@ class Toggler {
       final newS = Toggler(
           bits: isDs ? bits : nEW, ds: isDs ? nEW : ds, rg: rg, hh: nhh);
       newS.chb = isDs ? ds ^ nEW : bits ^ nEW; // pass coming single change bit
-      // hold(); // user's fix may call chain of setters that might also register
-      if (fix!(oldS, newS)) {
-        assert(hh.toUnsigned(_imax) == oldS.hh, 'State data race detected!');
+      if (fix!(_oldS!, newS)) {
+        // how it possibly could happen now?. Only if user code manipulated hh.
+        assert(hh.toUnsigned(_imax) == _oldS!.hh, 'State data race detected!');
         bits = newS.bits;
         ds = newS.ds;
         hh = newS.hh;
         rg = newS.rg; // may come with 'done' flag set by fix
-        chb = ((bits ^ oldS.bits) | (ds ^ oldS.ds)).toUnsigned(_imax);
+        chb = ((bits ^ _oldS!.bits) | (ds ^ _oldS!.ds)).toUnsigned(_imax);
       }
     } else {
       hh = nhh;
@@ -503,12 +509,13 @@ class Toggler {
       chb = isDs ? ds ^ nEW : bits ^ nEW;
       isDs ? ds = nEW : bits = nEW;
     }
-    _hold = null; // resume
     if (after != null) {
-      done ? rg = rg.toUnsigned(_imax) : after!(oldS, this);
+      done ? rg = rg.toUnsigned(_imax) : after!(_oldS!, this);
     } else if (notifier != null) {
+      _oldS = null; // resume before
       done ? rg = rg.toUnsigned(_imax) : notifier!.pump(chb);
     }
+    _oldS = null; // resume
   }
 
   /// not registering setter for disable bits, for use from user `fix` code
@@ -558,8 +565,3 @@ abstract class ToggledNotifier {
   void detachSelf() {}
 }
 // coverage:ignore-end
-
-// ignore: camel_case_types
-class _dummy extends Object {
-  const _dummy();
-}

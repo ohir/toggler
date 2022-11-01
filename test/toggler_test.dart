@@ -427,6 +427,7 @@ void main() {
       expect(flags.hh >> 8 == 0x3ff, isTrue);
     });
     test('live state on hold may never change', () {
+      expect(flags.fixed, isTrue);
       flags.fix = null;
       flags.after = null;
       var noo = TCNo();
@@ -486,6 +487,7 @@ void main() {
       flags.set1(9);
       expect(last == 3, isTrue); // notify skipped, done = true
     });
+    /* XXX no reentrant races now */
     test('Make artificial race | should throw', () {
       expect(() {
         flags.set1(25);
