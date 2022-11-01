@@ -157,7 +157,11 @@ class Toggler {
     this.rg = 0,
     this.hh = 0,
   }) {
-    rg = rg.toUnsigned(_imax); // never copy with done
+    // clear internal flags, if set
+    rg &= _mtm; // done
+    hh &= _mtm;
+    ds &= _mtm;
+    bits &= _mtm; // error
   }
 
   /// _done_ flag can be set on a _live_ Toggler by an outer code. 'Done' always
@@ -239,8 +243,8 @@ class Toggler {
     if (ntg != bits) verto(bIndex, ntg, false, false);
   }
 
-  /// returns a deep copy of the Toggler, including `after`, `notifier`, and
-  /// `fix` references; _done_ flag is cleared always.
+  /// returns a deep copy of the Toggler state, including `after`, `notifier`,
+  /// and `fix` references; Flags (done, error) are cleared. Volatile `chb` is 0.
   Toggler clone() => Toggler(
       notifier: notifier,
       after: after,
@@ -248,7 +252,6 @@ class Toggler {
       bits: bits,
       ds: ds,
       rg: rg,
-      chb: chb,
       hh: hh);
 
   /// _true_ if state of `this` and `other` differs. Optionally just at positions
@@ -398,8 +401,8 @@ class Toggler {
     state ? set1(i, ifActive: ifActive) : clear(i, ifActive: ifActive);
   }
 
-  /// get copy of state; _done_ flag and handlers are cleared on the copy.
-  Toggler state() => Toggler(bits: bits, ds: ds, rg: rg, chb: chb, hh: hh);
+  /// get copy of state, with flags, handlers and chb cleared.
+  Toggler state() => Toggler(bits: bits, ds: ds, rg: rg, hh: hh);
 
   /// toggle item unconditionally to signal some other Model change
   void signal(int bIndex) => toggle(bIndex);
@@ -436,17 +439,27 @@ class Toggler {
   @pragma('dart2js:tryInline')
   int vma(int mask, {int trim = _mtm}) => mask & trim;
 
+  Toggler? _hold;
+
   /// set semaphore forebading any changes to the live Toggler state.
   /// To be used in `fix` if it calls Model setters that would subsequently
   /// register changes at this very Toggler instance.
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
-  void hold() => hh |= (1 << _bf);
+  void hold() {
+    assert(_hold is! Toggler, 'hold called during the `fix` run');
+    assert(_hold == null, 'hold called on an already held Toggler');
+    _hold ??= _dummy() as Toggler;
+  }
 
   /// now allow changes to the live state (opposite of `hold()`)
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
-  void resume() => hh = hh.toUnsigned(_imax); // 51
+  void resume() {
+    assert(
+        _hold == null || _hold is _dummy, 'resume called during the `fix` run');
+    _hold = null;
+  }
 
   /// Toggler state change engine.  For legitimate use of `verto` see `replay(cas)`
   /// method in examples TogglerReplay extension. (_Verto means 'to turn' in
@@ -474,7 +487,7 @@ class Toggler {
       final newS = Toggler(
           bits: isDs ? bits : nEW, ds: isDs ? nEW : ds, rg: rg, hh: nhh);
       newS.chb = isDs ? ds ^ nEW : bits ^ nEW; // pass coming single change bit
-      hold(); // user's fix may call chain of setters that might also register
+      // hold(); // user's fix may call chain of setters that might also register
       if (fix!(oldS, newS)) {
         assert(hh.toUnsigned(_imax) == oldS.hh, 'State data race detected!');
         bits = newS.bits;
@@ -483,7 +496,7 @@ class Toggler {
         rg = newS.rg; // may come with 'done' flag set by fix
         chb = ((bits ^ oldS.bits) | (ds ^ oldS.ds)).toUnsigned(_imax);
       }
-      resume();
+      // resume();
     } else {
       hh = nhh;
       rg = rg.toUnsigned(_imax);
@@ -544,3 +557,8 @@ abstract class ToggledNotifier {
   void detachSelf() {}
 }
 // coverage:ignore-end
+
+// ignore: camel_case_types
+class _dummy extends Object {
+  const _dummy();
+}
