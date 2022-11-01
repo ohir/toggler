@@ -437,7 +437,7 @@ void main() {
     test('brand may not change with history', () {
       flags.hh = 0xff << 8;
       flags.toggle(49);
-      flags.tapTg(50); // use alternate
+      flags.toggle(50);
       flags.toggle(51);
       expect(flags.hh >> 8 == 0x3ff, isTrue);
     });
@@ -492,14 +492,14 @@ void main() {
     });
     test('set value on fix throws', () {
       bool cf(Toggler oS, Toggler nS) {
-        expect(oS.recChangeMask, equals(1));
-        expect(flags.recSignalsMask, equals(1));
+        expect(oS.changedBits, equals(1));
+        expect(flags.signalBits, equals(1));
         m1.val = 1;
-        expect(oS.recChangeMask, equals(3));
-        expect(flags.recSignalsMask, equals(3));
+        expect(oS.changedBits, equals(3));
+        expect(flags.signalBits, equals(3));
         m2.val = 11;
-        expect(oS.recChangeMask, equals(7));
-        expect(flags.recSignalsMask, equals(7));
+        expect(oS.changedBits, equals(7));
+        expect(flags.signalBits, equals(7));
         return true;
       }
 
@@ -510,14 +510,14 @@ void main() {
     test('outer signal makes to us', () {
       int fixes = 0;
       bool cf(Toggler oS, Toggler nS) {
-        expect(oS.recChangeMask, equals(1));
-        expect(flags.recSignalsMask, equals(1));
+        expect(oS.changedBits, equals(1));
+        expect(oS.signalBits, equals(1));
         m1.val = 1;
-        expect(oS.recChangeMask, equals(3));
-        expect(flags.recSignalsMask, equals(3));
+        expect(oS.changedBits, equals(3));
+        expect(oS.signalBits, equals(3));
         m2.val = 2;
-        expect(oS.recChangeMask, equals(7));
-        expect(flags.recSignalsMask, equals(7));
+        expect(oS.changedBits, equals(7));
+        expect(oS.signalBits, equals(7));
         fixes++;
         return true;
       }
@@ -532,14 +532,11 @@ void main() {
     test('clearSignal mask works', () {
       int fixes = 0;
       bool cf(Toggler oS, Toggler nS) {
-        expect(oS.recChangeMask, equals(1));
-        expect(flags.recSignalsMask, equals(1));
+        expect(oS.changedBits, equals(1));
         m1.val = 1;
-        expect(oS.recChangeMask, equals(3));
-        expect(flags.recSignalsMask, equals(3));
+        expect(oS.changedBits, equals(3));
         m2.val = 2;
-        expect(oS.recChangeMask, equals(7));
-        expect(flags.recSignalsMask, equals(7));
+        expect(oS.changedBits, equals(7));
         oS.clearSignal(1);
         fixes++;
         return true;

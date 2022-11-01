@@ -13,7 +13,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (193 of 193 lines)
+/// Test coverage: **100.0%** (192 of 192 lines)
 library toggler;
 
 const _bits = 53; // 53:web 64:noWeb // dart2js int is 53 bit
@@ -112,7 +112,7 @@ class Toggler {
   /// condition is met, or testing and/or manipulating outer state a [Toggler]
   /// instance reflects.
   ///
-  /// _Fix_ fires either on a direct change request (ie. set1, clear, toggle),
+  /// _Fix_ fires either on a direct change request (eg. set1, clear, toggle),
   /// or on a _signal_ called by a reflected entity.  Direct changes to the
   /// _live_ state may not happen during the `fix` run, signals may.
   ///
@@ -122,21 +122,24 @@ class Toggler {
   /// - `newState` is-a state copy of the _live_ object with direct change
   /// already applied, if any came. This object can be manipulated in `fix` then
   /// it will be commited to the _live state_ (on `fix` returning _true_).
-  /// - `chb` fields of _old_ and _new_ always differ. Old reflects a _signal_,
-  /// if any came. New reflects a direct change, if any came. Ie one will have
-  /// a 1 set at the index of change, the other will be all 0s.
-  /// If `fix` manipulates external entities that _signal_ back, such signal
-  /// will be reflected on _oldState.chb_ immediately, ie. can be tested during
-  /// a `fix` run. The recSignals property reads it.
-  /// - On a state commit later, both old and new `chb` are merged (ORed) so
-  /// _live_ `chb` will reflect indice of all changes that were made during the
-  /// most recent `fix` run.
+  /// - `newState.changedBits` reflects a direct change, if any came.  It will be
+  /// zero if `fix` was called via _signal_.  During `fix` run it may change as
+  /// `fix` code changes its `newState` argument.
+  /// - `oldState.signalBits` reflects a signal, if any came. It will be zero if
+  /// `fix` was called for a direct change (eg. set1 or disable).  If `fix`
+  /// manipulates external entities that _signal_ back, such signal will be
+  /// reflected at `oldState.signalBits` immediately. Ie. signals can be tested
+  /// during a `fix` run.
+  /// - On a state commit later, signalBits are merged (ORed) to the _live_ state
+  /// `chb`, unless supressed or cleared.
+  /// - `oldState.clearSignal(bIndex)` resets outgoing change bit. So outer world
+  /// may not learn that some internal state changed.
   ///
   /// On `fix` _true_ return, _newState_ will be commited, ie. copied to the
   /// live Toggler object in a single run.  Then either `notifier` will be
-  /// _pumped_ with changes, or the `after` handler will run. If either is
-  /// present and unless supressed.  If `fix` returns _false_ changes to the
-  /// state register are abandoned.
+  /// _pumped_ with `chb` change bits, or the `after` handler will run. If
+  /// either is present and unless supressed.  If `fix` returns _false_ changes
+  /// to the state register are abandoned.
   ///
   /// A `fix` code may suppress subsequent `notifier` or `after` call by setting
   /// _done_ flag on a _newState_. This internal _done_ state is not copied to
@@ -145,7 +148,7 @@ class Toggler {
   /// In simpler Apps `fix` state handler is the only place where business-logic
   /// is implemented and where Model state transitions occur.
   ///
-  /// If `fix` is null _signals_ are ignored, then every and each direct change
+  /// If `fix` is null _signals_ are ignored and every and each direct change
   /// from a setter is commited immediately.
   TogglerStateFixer? fix;
 
@@ -447,14 +450,11 @@ class Toggler {
   @pragma('dart2js:tryInline')
   bool get fixed => _oldS == null;
 
-  /// toggle item unconditionally to signal some other Model change
-  void tapTg(int bIndex) => toggle(bIndex);
-
   // =========================== Signal api ===============================
   /// keeps oldState state copy for the `fix` run. Its chb keeps a firing signal.
   Toggler? _oldS;
 
-  /// signal some change of `bIndex`. A noop if there is no `fix` handler attached;
+  /// signal some change at `bIndex`. A noop if there is no `fix` handler attached;
   void signal(int bIndex) {
     if (fix == null) return;
     _oldS != null
@@ -462,24 +462,27 @@ class Toggler {
         : verto(0, 0, false, false, sigm: 1 << v(bIndex));
   }
 
-  /// non-zero mask if `fix` ran on a signal, or if signals came within a `fix` run.
-  /// May not be read out of the running `fix` body (it is a computed property).
+  /// Non-zero (signals mask) if `fix` ran on a signal, or if signals came
+  /// within a `fix` run.
+  /// - _!!! To be used only on an _oldState_ argument within a `fix` handler_
+  ///
   /// - 1s are set at received signal indice
   /// - may change during the `fix` run, if `fix` modifies something external
   /// that in turn signals back.
   ///
-  ///
-  /// In _release_ builds it just returns 0 on improper uses instead of throwing
-  /// on an assert (put here to spare time of docsreading-impaired).
+  /// In _release_ builds it just returns `chb`.
+  /// Aliases _changedBits_ - with assert added to spare time of docs-impaired.
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
-  int get recSignalsMask {
-    assert(_oldS != null && _oldS!.held,
-        'recSignals may be read only from within `fix` handler of the _live_ Toggler.');
-    return _oldS != null ? _oldS!.chb : 0;
+  int get signalBits {
+    assert(
+        fix == null && held, // _live_ may not have null fix, copy can't be held
+        'signalBits may read only on the oldState argument of the fix handler');
+    return chb;
   }
 
-  int get recChangeMask => chb;
+  /// convenience getter of `chb` "changed bits" property
+  int get changedBits => chb;
 
   /// Clears _bIndex_ before state changes are commited after the `fix` run, so
   /// this cleared state change signal will not eventually make to the
@@ -545,7 +548,7 @@ class Toggler {
   Debug hint: this might even be set from a far away code of a distant fixer that
   fired after _this_ fix changed some other Toggler (eg. underlying other Model).
 ''');
-    if (ds & (1 << _bf) != 0) return; // live but on hold
+    if (_oldS != null || ds & (1 << _bf) != 0) return; // live but on hold
     final nhh = (((hh.toUnsigned(_imax) >> 16) + 1) << 16) | // serial++
         ((hh.toUnsigned(16) & 0xff00) | //  b15..b8: extensions reserved
             (isDs ? (1 << 7) : 0) | //    cabyte b7: tg/ds

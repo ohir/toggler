@@ -9,20 +9,20 @@ void main() {
   print('''
 // Toggler works best with named indice. You generated them, hopefully to
 // conventional 'tg_names.dart' file. Now you should make use of your editor
-// select consecutive two lines and rename "ReNameMe#" (no bi and sm prefice!)
+// select consecutive two lines and rename "ReNameMe#" (no b and s prefice!)
 // to any meaningful name you want. Enjoy!
 
 // keep biFreeIndex updated to be 1 over your last renamed index''');
-  print('const biFreeIndex = $bIndexMax;');
-  print('// then smAll mask will cover just bits you use, not more');
-  print('const smAll = (1 << biFreeIndex) - 1;');
-  print('const smNone = 0;');
+  print('const bFreeIndex = $bIndexMax;');
+  print('// then sAll mask will cover just bits you use, not more');
+  print('const sAll = (1 << biFreeIndex) - 1;');
+  print('const sNone = 0;');
   print(
       "// rename below with 'search & replace' to keep 'tg' and 'sm' prefixes ");
 
   int n = 0;
   for (; n < bIndexMax; n++) {
-    print('const biReNameMe$n = $n;');
-    print('const smReNameMe$n = 1 << biReNameMe$n;');
+    print('const bReNameMe$n = $n;');
+    print('const sReNameMe$n = 1 << bReNameMe$n;');
   }
 }
