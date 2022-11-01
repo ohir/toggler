@@ -474,9 +474,10 @@ class Toggler {
       isDs ? ds = nEW : bits = nEW;
       return;
     }
-    if (hh & (1 << _bf) != 0) return; // live but on hold
+    if (_hold != null) return; // live but on hold
 
-    final oldS = Toggler(bits: bits, ds: ds, rg: rg, hh: hh);
+    final oldS = state(); //Toggler(bits: bits, ds: ds, rg: rg, hh: hh);
+    _hold = oldS; // hold
     if (done) oldS.markDone(); // fix and after should know
     final nhh = (((hh.toUnsigned(_imax) >> 16) + 1) << 16) | // serial++
         ((hh.toUnsigned(16) & 0xff00) | //  b15..b8: extensions reserved
@@ -496,13 +497,13 @@ class Toggler {
         rg = newS.rg; // may come with 'done' flag set by fix
         chb = ((bits ^ oldS.bits) | (ds ^ oldS.ds)).toUnsigned(_imax);
       }
-      // resume();
     } else {
       hh = nhh;
       rg = rg.toUnsigned(_imax);
       chb = isDs ? ds ^ nEW : bits ^ nEW;
       isDs ? ds = nEW : bits = nEW;
     }
+    _hold = null; // resume
     if (after != null) {
       done ? rg = rg.toUnsigned(_imax) : after!(oldS, this);
     } else if (notifier != null) {
