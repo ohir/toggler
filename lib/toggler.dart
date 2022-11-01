@@ -18,9 +18,12 @@ library toggler;
 
 const _bits = 53; // 53:web 64:noWeb // dart2js int is 53 bit
 
-const _bf = _bits - 1; // flag bit
-const _imax = _bits - 2; // item max bit
-const _mtm = (1 << _bf) - 1; // mask trimmer
+///   (52) flag bit index
+const _bf = _bits - 1; //
+/// (51) item max index bit
+const _imax = _bits - 2; //
+/// selects all state bits 0..51, a sMask trimmer
+const _mtm = (1 << _bf) - 1; //
 
 /// Last usable bit index. While it could be 62, it is now 51 to enable web use.
 /// If you need no web and really need 10 more flags you may use source package
@@ -35,30 +38,35 @@ const bIndexMax = _imax;
 /// groups of items.  Each state bit value can be retrieved and set using
 /// index[] operator, usually with a constant symbolic name.
 ///
-/// By convention Toggler const index name has a `bi` (bit index) name prefix,
-/// then respective const bitmask uses `sm` (select mask) prefix. Eg.
-/// `const biPrize = 33; const smPrize = 1 << biPrize;`
+/// By convention Toggler const index name has a `b` (bit index) name prefix,
+/// then respective const bitmask uses `s` (select mask) prefix. Eg.
+/// `const bPrize = 33; const sPrize = 1 << bPrize;`
 ///
 /// _In package's tool/ directory there is a script that generates stub
 /// constants together with their masks, for library user to rename later_.
 class Toggler {
   /// togglee item 0..51 value bit:     1:set 0:cleared.
+  /// - a state field
   int bits;
 
   /// togglee item 0..51 disable bit:   1:disabled 0:enabled.
   ///
   /// Note that class api operates in terms of "active", ie. on
   /// negation of _ds_ bits.
+  /// - a state field
   int ds;
 
   /// radio-groups 0..51 (mask):        1:member of adjacent 1s group.
+  /// - a config field
   int rg;
 
   /// recently changed at 0..51 (bits): 1:at this bit index.
+  /// - a signal field. Volatile state:  neither copied nor cloned.
   ///
-  /// changed bits indicator tells indice of all state changes, both in _bits_
-  /// and _ds_.  At `fix` call _newState.chb_ will have only one bit set, for use
-  /// in `fix` code, then after `fix` _chb_ will be updated to reflect **all**
+  /// XXX changed bits indicator tells indice of all state changes, both in _bits_,
+  /// _ds_, and/or of some external entity observed by a Toggler instance.
+  ///
+  /// XXX in `fix` code, then after `fix` _chb_ will be updated to reflect **all**
   /// changed indice, including ones changed by `fix`. Use _changed_ method to
   /// access _chb_ in a readable way.
   int chb;
@@ -66,6 +74,7 @@ class Toggler {
   /// history hash keeps `serial` and `recent` values.  Live Toggler updates
   /// `hh` on each state change. State copies have `hh` frozen at values origin
   /// had at copy creation time, even if they are being manipulated after.
+  /// - a status field
   ///
   /// Note: Whether `hh` should be serialized and restored depends on App's
   /// state management architecture used. Keep in mind that MSb of `hh` holds a
@@ -97,22 +106,41 @@ class Toggler {
 
   /// handler `bool fix(Toggler oldState, Toggler newState)`
   /// manages state transitions. Eg. enabling or disabling items if some
-  /// condition is met.  If `fix` is null every single state change from a
-  /// setter is commited immediately.
+  /// condition is met, or testing and/or manipulating outer state a [Toggler]
+  /// instance reflects.
   ///
-  /// On _true_ return, _newState_ will be commited, ie. copied to the live
-  /// Toggler object in a single run.  Then either `notifier` will be _pumped_
-  /// with changes, or `after` part will run. If either is present and unless
-  /// supressed.
+  /// _Fix_ fires either on a direct change request (ie. set1, clear, toggle),
+  /// or on a _signal_ called by a reflected entity.
+  ///
+  /// At `fix` call:
+  /// - _oldState_ and _newState_ are state copies of the _live_ object, except for:
+  /// - `newState.bits` and `newState.ds` will have direct change already
+  /// applied, if any came. On a _signal_ both are untouched.
+  /// - `chb` fields of _old_ and _new_ always differ. Old reflects a _signal_,
+  /// if any came. New reflects a direct change, if any came. Ie one will have
+  /// a 1 set at the index of change, the other will be all 0s.
+  /// - If `fix` manipulates external entities that _signal_ back, such signal
+  /// will be reflected on _oldState.chb_ immediately, ie. can be tested during
+  /// a `fix` run.  On a state commit later, both old and new `chb` are merged
+  /// (ORed).  Ie. _live_ `chb` will reflect indice of all changes made during
+  /// the most recent `fix` run.
+  /// - Direct changes to the _live_ state may not happen during the `fix` run,
+  /// signals may.
+  ///
+  /// On `fix` _true_ return, _newState_ will be commited, ie. copied to the
+  /// live Toggler object in a single run.  Then either `notifier` will be
+  /// _pumped_ with changes, or `after` part will run. If either is present and
+  /// unless supressed.
   ///
   /// A `fix` code may suppress subsequent `notifier` or `after` call by setting
   /// _done_ flag on a _newState_. This internal _done_ state is not copied to
   /// the live Toggler on commit.
   ///
   /// In simpler Apps `fix` state handler is the only place where business-logic
-  /// is implemented and where Model state transitions occur. In _reactive_
-  /// state management, usually `after` is null and `fix` alone sends state
-  /// copies up some Stream.
+  /// is implemented and where Model state transitions occur.
+  ///
+  /// If `fix` is null _signals_ are ignored, then every and each direct change
+  /// from a setter is commited immediately.
   TogglerStateFixer? fix;
 
   /// All Toggler members are public for easy tests and custom serialization.
