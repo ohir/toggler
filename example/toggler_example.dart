@@ -45,8 +45,8 @@ void main() {
       if (nS[biNameF]) {
         nS.disable(biNameB);
         nS.disable(biNameC);
-        nS.clear(biNameB);
-        nS.clear(biNameC);
+        nS.set0(biNameB);
+        nS.set0(biNameC);
       } else {
         nS.enable(biNameB);
         nS.enable(biNameC);

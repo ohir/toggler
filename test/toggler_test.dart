@@ -40,8 +40,8 @@ void main() {
       flags.set1(bIndexMax);
       expect(flags[0] && !flags[1] && !flags[bIndexMax - 1] && flags[bIndexMax],
           isTrue);
-      flags.clear(0);
-      flags.clear(bIndexMax);
+      flags.set0(0);
+      flags.set0(bIndexMax);
       expect(!flags[0] && !flags[bIndexMax], isTrue);
     });
     test('Is Set in range set boundry', () {
@@ -84,7 +84,7 @@ void main() {
     test('Disable Max', () {
       flags.set1(bIndexMax);
       flags.disable(bIndexMax);
-      flags.clear(bIndexMax, ifActive: true);
+      flags.set0(bIndexMax, ifActive: true);
       flags.setTo(bIndexMax, false, ifActive: true);
       expect(flags[bIndexMax], isTrue);
       flags.setTo(bIndexMax, false);
@@ -103,12 +103,12 @@ void main() {
     test('DisableEnable 33', () {
       flags.set1(33, ifActive: true);
       flags.disable(33);
-      flags.clear(33, ifActive: true);
+      flags.set0(33, ifActive: true);
       expect(flags[33], isTrue);
       flags.setTo(33, false, ifActive: true);
       expect(flags[33], isTrue);
       flags.enable(33);
-      flags.clear(33, ifActive: true);
+      flags.set0(33, ifActive: true);
       expect(flags[33], isFalse);
     });
     test('Toggle 0', () {
@@ -127,7 +127,7 @@ void main() {
       var c1 = cLive.state();
       cLive.set1(7);
       var c2 = cLive.state();
-      cLive.clear(1);
+      cLive.set0(1);
       expect(c0.isOlderThan(c1), isFalse); // copy to copy
       expect(c1.isOlderThan(c2), isTrue); // copy to copy
       expect(c2.isOlderThan(c1), isFalse); // copy to copy
@@ -523,7 +523,7 @@ void main() {
       expect(flags.chb, equals(7));
     });
 
-    test('clearSignal mask works', () {
+    test('fixSignal works', () {
       int fixes = 0;
       bool cf(Toggler oS, Toggler nS) {
         expect(oS.signalsComing, equals(1));
@@ -531,7 +531,8 @@ void main() {
         expect(oS.signalsComing, equals(3));
         m2.val = 2;
         expect(oS.signalsComing, equals(7));
-        oS.fixSignal(1, false);
+        oS.fixSignal(1, false); // clear 2
+        oS.fixSignal(4, true); // set 16
         fixes++;
         return true;
       }
@@ -540,7 +541,7 @@ void main() {
 
       m0.val = 2;
       expect(fixes, equals(1));
-      expect(flags.chb, equals(5)); // 1 masked
+      expect(flags.chb, equals(21)); // 1 => 0, 4 => 1
     });
   });
 

@@ -4,11 +4,37 @@
 
 For direct use in ViewModels of _Flutter_ UI **Toggler** provides an independent _disabled_ property for each of state register bits and supports "radio grouping" among adjacent two or more of them.
 
-**Toggler** was designed for MVVM and similar newer architectures with unidirectional flow of state changes. It was specifically tailored for safe use in singleton _Models_, guaranteeing that changes coming from an outdated ancestor state will be detected and automatically skipped. Yet it may also be used in _reactive_ state management architectures, having the `clone` method.
+**Toggler** was designed for MVVM and similar newer architectures with unidirectional flow of state changes. It was specifically tailored for safe use with singleton _Models_.
+With ultimate goal of it being as safe as _Reactive_ setups but without hundreds of boilerplate _copyWith_ constructors for user to write.
 
 Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (192 of 192 lines)`
+Test coverage: `100.0% (195 of 195 lines)`
+
+## Why should I use this for app state managnment?
+
+TL;DR State machines, ie. _Models_, built on Toggler promise to be fully testable, as **all** state transitions within are dealt with by a **synchronous** code of "state fixers".  Async things that in app will _signal_ Toggler can be mocked at ease and both their signals and their values permuted at will at test time - **reproducibly** on a **predictable** schedule.
+
+Will Toggler deliver on this promise? Time will tell. That's a fresh idea and fresh code.
+
+Longer story at end of README
+
+## When should I use this?
+
+If you know your app functionality will only grow.
+
+
+## Observable State Register?
+
+Its simple:
+1. every _bit_ of a register reflects _something_ (an item) that may change in your _Model_.
+2. if that _item_ changes, it _signals_ register about change: just with its given (at birth) bit _index_. If _item_ happens to be a boolean value, it can just be set, or toggled directly at the register, that also can be a _signal_.
+3. copy of a current register along with _signal_ bit position is then passed to the state machine _fixer_ realizing some business-logic for the _Model_.
+4. fixer, knowing who changed from _signal_, may inspect content of the _item_ then may flip, set, or clear respective bit of register to accept (or decline) signalled change.
+5. Fixer can also initiate change of other _items_, if state transition schema so mandates. Then bits of these other _items_ will also be toggled, set, or cleared.
+6. Finally, realized by fixer state machine arrives at its prescribed next stable state, new content of the register is compared to the previous, diff made, then this diff is exposed to the _outer world_. Eg. pushed to a _notifier_.
+
+Observers from the _outer world_ seeing this diff (changed-bits signal) may decide whether the recent changes are of any interest to them. Simply with filtering coming diff with a bitmask.
 
 ## Getting started
 
@@ -81,50 +107,57 @@ _See example/flutter_example.dart for a complete app code._
 7. -> 1. State machine will run again at the next change that registers in Toggler.
 
 <!--
-## API 101
+-->
+### API DTL;DR
 
-#### constructors:
+You should read at least `fix` docs to make any serious use of Toggler.
+Skim over a below included api cheat-sheet for the rest.
+
+#### constructor:
 ```Dart
 Toggler({
   fix? = onChange(oldState, newState) handler, 
   after? = afterChange(oldState, liveState) handler,
-  notifier? = ToggledNotifier()
-  // bits: 0, ds: 0, rm: 0, rg: 0, chb: 0, hh: 0 // internals are exposed too
+  notifier? = ToggledNotifier(),
+  bits: 0, ds: 0, rg: 0, hh: 0, chb: 0, // internal registers are public too
 })
 ```
-- at least one state transition handler is needed to make a _live state_ Toggler. All other members can be given to default constructor, too - used eg. in saved state deserializer and tests. An all-default Toggler can be mutated at will, eg. in an explicit App state initializer. The `fix`, `after`, and `notifier` handlers can be attached later.
-- your code in `fix` may manipulate _newState_ at will, it even may assign a some predefined const values to the `bits` and/or `ds` properties of it. Usually `fix` is a Model's internal function so it may have access to all other pieces of your business logic (and of ViewModel logic).
-- your code in `after` may decide whether `notifier` should run, it may also do notifications by itself. Eg. if your legacy Widget code builds of StreamBuilder, `after` may feed the Stream for it.
+- at least one state transition handler is needed to make a _live state_ Toggler. All other members can be given to default constructor, too - used eg. in saved state deserializer and tests. An all-defaults Toggler can be mutated at will, eg. in an explicit App state initializer. The `fix`, `after`, and `notifier` handlers can be attached later.
+- your code in `fix` may manipulate _newState_ at will, it even may assign a some predefined const values to the `bits` and/or `ds` properties of it. Usually `fix` is a Model's internal function so it may have access to all other pieces of your business logic (and/or of ViewModel logic).
+- your code in `after` may decide whether `notifier` should run, it may also do notifications by itself. Eg. if your legacy Widget code builds of StreamBuilder, `after` may feed the Stream just for it - passing the rest to the `notifier`.
 - a `notifier` object usually comes from an associated library, but it can also be yours.
 
 #### factories:
-- `state()` returns a _copy of state_ only (`fix`, `after`, `notifier` are null).
-- `clone()` returns a _deep copy_ of `this`. _Caveat emptor!_
+- `clone()` returns a _deep copy_ of `this`, handlers including. _Caveat emptor!_
+- `state()` returns a _copy of state_ only. Ie. _bits_, _ds_, _hh_, and _rg_.
+  Other fields are at default, no handlers, no notifier.
 
 #### getters:
-- `[i]` returns state of item at index i (_true_ for a set item).
+- `[i]` returns state of item bit at index i (_true_ for a set1 item).
 - `active(i)` returns negation of _disabled_ property of item at index i.
 
 #### setters:
-- `[i]=` sets state of item at index i
-- `toggle(i)` flip state of item at index i
-- `set1(i)`, `clear(i)`, `setTo(i, state)` change a single item value at `i` index
+- `[i]=` sets state of item bit at index i
+- `toggle(i)` flip state of item bit at index i
+- `set1(i)`, `set0(i)`, `setTo(i, state)` change a single item bit value at `i` index
 - `enable(i)`, `disable(i)`, `setDS(i, state)` mutate _disabled_ property of an item
-- `set1(i, ifActive: true)`, `...` setters may depend on a _disabled_ property
-- `fixBits(bIndex, value)`, `fixDs(bIndex, value)` non-registering setters (for fix)
-- `signal(bIndex)` informs that some change was made externally and should be reflected
+- `set1(i, ifActive: true)`, `...` bit setters may depend on a _disabled_ property
+- `signal(i)` does not change state bits by itself but informs that some change was made
+  and likely it should be reflected at bit i, possibly after some checks.
+
+#### state fixer:
+- `fixBits(i, value)`, `fixDs(bIndex, value)` non-registering setters
+- `fixSignals(i, value)` supress or force a changed-bit signal (for fix only)
 
 #### state tests:
 - `chb` property has bits set to 1 at positions that recently changed state
-- `recent` is index of a latest singular change coming from setter
+- `recent` is index of a latest singular state bit change that came from a setter
 - `serial` is a monotonic state serial number (35b), bigger is newer
-- `isOlderThan(other)` compares serial numbers of state copies
-- `changedAt(bIndex)` tells if there was a change at _bIndex_
 - `changed(selmask)` tells if there was a change on any of _selmask_ positions
-- `anyOfSet({first, last, selmask})` _true_ if any item is set in range or by selmask
-- `differsFrom(other, {first, last, selmask})` compares this and other state
-- `signalBits` has 1s on positions recently given to _signal(bIndex)_ call(s)
-- `lastChanges` has 1s on positions changed by a state bit setter (like set1)
+- `changedAt(bIndex)` tells if there was a change at _bIndex_
+- `anyOfSet({first, last, selmask})` _true_ if any item bit is set in range or by selmask
+- `differsFrom(other, {first, last, selmask})` compares this and other state (bits, ds)
+- `isOlderThan(other)` compares serial numbers of this and other
 
 #### diagnostics:
 - `v` internally verifies index (as given to any of methods)
@@ -132,11 +165,10 @@ Toggler({
 - `error` _true_ if in release build Toggler method got a wrong index
 - `done` _true_ if set by your App code. Cleared at every new change.
 - `held` _true_ if changes to state register were supressed by `hold()`,
-  _false_ if changes are allowed, ie. by default after a call to `resume()`
+  _false_ if changes are allowed, ie. after a call to `resume()`
 
 #### radio group setup:
 - `radioGroup(first, last)` If one in given range is set, others are cleared automatically.
--->
 
 #### serialize:
 Toggler intentionally has no `toString` nor `toJSON` methods. Its whole state is public and consist of just four _ints_. It should be handled seamlessly by any serialization method one may have chosen for a whole _Model_.
@@ -164,8 +196,14 @@ For the practical usage a simpler solution exists that wastes no cpu cycles and 
 _Follow the convention. Then if not you visually at writing, your linter later may spot that the ending of a parameter name does not match the suffix of the name of the receiving object and warn you accordingly_.
 
 
-### traps and remedies
+### hints, traps, and remedies
 
-- This library is synchronous so your handler methods should complete fast. Any interface with async code should be done via a proper state cycle (eg. in a separate Isolate). Ie. while your async code may easily register in Toggler, you may pass any changes back only using a `notifier`.
+- This library is synchronous so your handler methods should complete fast. Any interface with async code should be done via a proper state cycle (eg. in a separate Isolate). Ie. while your async code may easily register in Toggler, you should pass any changes back only using a `notifier`.
 
-- While `fix` runs the live Toggler state is on [hold]. It means that any further changes to the register are **silently dropped**. If your `fix` mutates external to Toggler data that would register a change from their setter, `fix` must do it for them internally. The `fixBits(bIndex, value)` and `fixDs(bIndex, value)` methods are meant just for that.
+- While `fix` runs the live Toggler state is on [hold]. It means that any further direct changes to the register are forbidden. Signals though work, so if your `fix` code mutates an external item that normally signals register about a change, this signal will come and it will be reflected at the _changed bits_ outgoing signal (unless you supress it within the `fix` handler).
+
+#### promised longer intro
+
+_Any and every app IS-A state machine. With Dart async code it is hard to have a predictable and testable state machine encompassing a big app, like a tax filling tool. We usually deal with state transitions complexity by isolating and chopping functionality to smallest possible pieces, ones that transit a few bits of state. Then we do a patchwork of them to get at envisioned user experience._
+
+_It usualy works. Until it wont anymore due to "impossible states" that starts to show: usually at random, at some machines, for some users - as our app grew. Unit tests can't catch intertwined transitions. Integration tests then are asynchronous but on our machines - so "here it works". Then we bloat code with more monitors hoping to catch culprit in the wild. Nope. Surrounded by monitors heisenbug hides well..._

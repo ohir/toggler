@@ -13,7 +13,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (192 of 192 lines)
+/// Test coverage: **100.0%** (195 of 195 lines)
 library toggler;
 
 const _bits = 53; // 53:web 64:noWeb // dart2js int is 53 bit
@@ -122,34 +122,17 @@ class Toggler {
   ///
   /// Any operations `fix` does on its `newState` argument will be seen as a
   /// next _live state_ after `fix` returns (true).  The `oldState` argument
-  /// provides `fix` with a view into the live state. It also allows `fix` to
-  /// read incoming, and set or supress outgoing, change _signals_.
+  /// provides `fix` with a view into the current live state. It also allows
+  /// `fix` to read (incoming), set or supress (outgoing) change _signals_.
   ///
   /// _Fix_ fires either on a direct change request (eg. set1, clear, toggle),
   /// or on a _signal_ called by a reflected entity.  Direct changes to the
   /// _live_ state may not happen during the `fix` run, signals may. Any signal
-  /// that come during `fix` run can be read immediately via `oldState': `chb`,
-  /// `changes([sMask])`, or `changesAt([bIndex])` of the _oldState_.
-  ///
-  ///
-  /// At `fix` call:
-  /// - `oldState.bits` and `oldState.ds` are copied from the _live_ object. Other
-  /// `oldState` fields are of internal use (explained below).
-  /// - `newState` is-a state copy of the _live_ object with direct change
-  /// already applied, if any came. This object can be manipulated in `fix` then
-  /// it will be commited to the _live state_ (on `fix` returning _true_).
-  /// - `newState.changedBits` reflects a direct change, if any came.  It will be
-  /// zero if `fix` was called via _signal_.  During `fix` run it may change as
-  /// `fix` code changes its `newState` argument.
-  /// - `oldState.signalBits` reflects a signal, if any came. It will be zero if
-  /// `fix` was called for a direct change (eg. set1 or disable).  If `fix`
-  /// manipulates external entities that _signal_ back, such signal will be
-  /// reflected at `oldState.signalBits` immediately. Ie. signals can be tested
-  /// during a `fix` run.
-  /// - On a state commit later, signalBits are merged (ORed) to the _live_ state
-  /// `chb`, unless supressed or cleared.
-  /// - `oldState.clearSignal(bIndex)` resets outgoing change bit. So outer world
-  /// may not learn that some internal state changed.
+  /// that come during `fix` run can be read immediately on an _oldState_
+  /// argument with `chb`, `changes([sMask])`, or `changesAt([bIndex])`.
+  /// - On a state commit signals that came are merged with _newState_ register
+  /// changes and both make to the _live state_ `chb`. Unless supressed or cleared
+  /// using `oldState.fixSignal(bIndex, to:true/false)` method.
   ///
   /// On `fix` _true_ return, _newState_ will be commited, ie. copied to the
   /// live Toggler object in a single run.  Then either `notifier` will be
@@ -158,8 +141,8 @@ class Toggler {
   /// to the state register are abandoned.
   ///
   /// A `fix` code may suppress subsequent `notifier` or `after` call by setting
-  /// _done_ flag on a _newState_. This internal _done_ state is not copied to
-  /// the live Toggler on commit.
+  /// _done_ flag on a _newState_. This internally set _done_ is **not** copied
+  /// to the live state on commit.
   ///
   /// In simpler Apps `fix` state handler is the only place where business-logic
   /// is implemented and where Model state transitions occur.
@@ -263,13 +246,13 @@ class Toggler {
   @pragma('dart2js:tryInline')
   bool changedAt(int at) => chb & (1 << v(at)) != 0;
 
-  /// clear (to _0_, _off_, _false_ state) item at _bIndex_.
+  /// clear (to _0_, _off_, _false_) item bit at _bIndex_.
   /// Optional argument `ifActive: true` mandates prior _active_ check.
-  /// Ie. item will be cleared only if it is active.
+  /// Ie. item bit will be cleared only if item is active.
   ///
   /// Note that _clear_ does not know about radio groups by itself
   /// so _clear_ of an active radio member will make all in group being off.
-  void clear(int bIndex, {bool ifActive = false}) {
+  void set0(int bIndex, {bool ifActive = false}) {
     bIndex = v(bIndex);
     if (ifActive && !active(bIndex)) return;
     int ntg = bits;
@@ -432,9 +415,7 @@ class Toggler {
   /// Optional argument `ifActive: true` mandates prior _active_ check.
   /// Ie.  item will change state only if it is active.
   void setTo(int bIndex, bool state, {bool ifActive = false}) {
-    state
-        ? set1(bIndex, ifActive: ifActive)
-        : clear(bIndex, ifActive: ifActive);
+    state ? set1(bIndex, ifActive: ifActive) : set0(bIndex, ifActive: ifActive);
   }
 
   /// get copy of state, with flags, handlers and chb cleared.
@@ -506,13 +487,10 @@ class Toggler {
     return held && !_live ? chb : 0;
   }
 
-  /// convenience getter of `chb` "changed bits" property
-  int get xchangedBits => chb;
-
-  /// forcefully fixes _bIndex_ "changed" signal, regardless of its source
-  /// (external or made during `fix`).  After `fix` handler returns, commited
-  /// _live state_ `chb` will have 1 or 0 at bIndex position, respective of `to`
-  /// argument being true(1) or false(0).
+  /// forcefully fixes _bIndex_ "changed" signal, regardless of its
+  /// source (be it external or made during `fix` run).
+  /// Commited _live state_ `chb` will then have 1 or 0 at bIndex position,
+  /// respective of `to` argument being true(1) or false(0).
   /// - _To be called only from `fix` and only on its `oldState` argument_.
   ///
   /// Hint: all incoming signals can be cleared using `oldState.chb = 0`, all
@@ -560,13 +538,13 @@ class Toggler {
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
   void fixDS(int bIndex, bool to) =>
-      to ? ds |= (1 << bIndex) : ds &= ~(1 << bIndex);
+      to ? ds |= (1 << v(bIndex)) : ds &= ~(1 << v(bIndex));
 
   /// not registering setter for state bits, for use from user `fix` code
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
   void fixBits(int bIndex, bool to) =>
-      to ? bits |= (1 << bIndex) : bits &= ~(1 << bIndex);
+      to ? bits |= (1 << v(bIndex)) : ds &= ~(1 << v(bIndex));
 
   /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
   @pragma('vm:prefer-inline')
