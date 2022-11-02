@@ -205,9 +205,9 @@ void main() {
       expect(c1.differsFrom(flags), isFalse);
       flags.set1(8);
       c1.set1(23);
-      expect(c1.differsFrom(flags, biFirst: 8, biLast: 22), isTrue);
-      expect(c1.differsFrom(flags, biFirst: 9, biLast: 22), isFalse);
-      expect(c1.differsFrom(flags, biFirst: 9, biLast: 23), isTrue);
+      expect(c1.differsFrom(flags, bFirst: 8, bLast: 22), isTrue);
+      expect(c1.differsFrom(flags, bFirst: 9, bLast: 22), isFalse);
+      expect(c1.differsFrom(flags, bFirst: 9, bLast: 23), isTrue);
     });
     test('Set 63 | should throw', () {
       expect(() {
@@ -301,7 +301,7 @@ void main() {
     });
     test('Demand bad diff| should throw', () {
       expect(() {
-        flags.differsFrom(flags.state(), biLast: 63);
+        flags.differsFrom(flags.state(), bLast: 63);
       }, throwsAssertionError);
     });
   });
@@ -492,14 +492,11 @@ void main() {
     });
     test('set value on fix throws', () {
       bool cf(Toggler oS, Toggler nS) {
-        expect(oS.changedBits, equals(1));
-        expect(flags.signalBits, equals(1));
+        expect(flags.signalsComing, equals(1));
         m1.val = 1;
-        expect(oS.changedBits, equals(3));
-        expect(flags.signalBits, equals(3));
+        expect(flags.signalsComing, equals(3));
         m2.val = 11;
-        expect(oS.changedBits, equals(7));
-        expect(flags.signalBits, equals(7));
+        expect(flags.signalsComing, equals(7));
         return true;
       }
 
@@ -510,14 +507,11 @@ void main() {
     test('outer signal makes to us', () {
       int fixes = 0;
       bool cf(Toggler oS, Toggler nS) {
-        expect(oS.changedBits, equals(1));
-        expect(oS.signalBits, equals(1));
+        expect(oS.signalsComing, equals(1));
         m1.val = 1;
-        expect(oS.changedBits, equals(3));
-        expect(oS.signalBits, equals(3));
+        expect(oS.signalsComing, equals(3));
         m2.val = 2;
-        expect(oS.changedBits, equals(7));
-        expect(oS.signalBits, equals(7));
+        expect(oS.signalsComing, equals(7));
         fixes++;
         return true;
       }
@@ -532,12 +526,12 @@ void main() {
     test('clearSignal mask works', () {
       int fixes = 0;
       bool cf(Toggler oS, Toggler nS) {
-        expect(oS.changedBits, equals(1));
+        expect(oS.signalsComing, equals(1));
         m1.val = 1;
-        expect(oS.changedBits, equals(3));
+        expect(oS.signalsComing, equals(3));
         m2.val = 2;
-        expect(oS.changedBits, equals(7));
-        oS.clearSignal(1);
+        expect(oS.signalsComing, equals(7));
+        oS.fixSignal(1, false);
         fixes++;
         return true;
       }
@@ -558,7 +552,7 @@ void main() {
       if (oS.recent == 25) {
         oS.hh <<= 1; // test abandon older state
       }
-      oS.differsFrom(nS, biFirst: 11, biLast: 16); // cover !differs path
+      oS.differsFrom(nS, bFirst: 11, bLast: 16); // cover !differs path
       if (nS[1] && nS.differsFrom(oS)) nS.set1(0); // test state fixing on 1
       if (nS[7] && nS.differsFrom(oS)) nS.markDone(); // test skip notify on 7
       if (nS[9] && nS.differsFrom(oS)) nS.done = true; // test skip notify on 9
