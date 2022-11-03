@@ -587,14 +587,13 @@ void main() {
       flags.set1(9);
       expect(last == 3, isTrue); // notify skipped, done = true
     });
-    /* XXX no reentrant races now */
+    /* With signals reentrant setter throws early! So no races below.
     test('Make artificial race | should throw', () {
       expect(() {
         flags.set1(25);
         flags.set1(0);
       }, throwsAssertionError);
-    });
-    // TODOx Make real racing test to hit `if (hh != newS.hh)` in _ckFix
+    });*/
   });
 }
 

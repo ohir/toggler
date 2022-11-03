@@ -13,7 +13,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (195 of 195 lines)
+/// Test coverage: **100.0%** (200 of 200 lines)
 library toggler;
 
 const _bits = 53; // 53:web 64:noWeb // dart2js int is 53 bit
@@ -464,11 +464,14 @@ class Toggler {
   Toggler? _oldS;
 
   /// signal some change at `bIndex`. A noop if there is no `fix` handler attached;
+  ///
+  /// Signal accepts also a tagged bIndex;
   void signal(int bIndex) {
     if (fix == null) return;
+    assert(bIndex & 0x3f < _bf, 'Bad signal bIndex ${bIndex & 0x3f}');
     _oldS != null
-        ? _oldS!.chb |= 1 << v(bIndex)
-        : verto(0, 0, false, false, sigm: 1 << v(bIndex));
+        ? _oldS!.chb |= 1 << bIndex.toUnsigned(6)
+        : verto(bIndex, 0, false, false, sigm: 1 << v(bIndex & 0x3f));
   }
 
   /// Non-zero mask if `fix` ran on a signal, or if signals came within a `fix`
@@ -569,11 +572,12 @@ class Toggler {
       return;
     }
     assert(_oldS == null,
-        '''State bit value may not be set from within running fix method.
-  Only signals are allowed during fix run.
+        '''Live state value may not be set externally during a state fixing round.
+  Only external signals are allowed while fixer runs.
 
   Debug hint: this might even be set from a far away code of a distant fixer that
-  fired after _this_ fix changed some other Toggler (eg. underlying other Model).
+  fired after _this_ fix called an external entity that in turn tries to directly
+  change this Toggler state. Thats wrong.  Always use signals.
 ''');
     if (_oldS != null || ds & (1 << _bf) != 0) return; // live but on hold
     final nhh = (((hh.toUnsigned(_imax) >> 16) + 1) << 16) | // serial++
@@ -582,31 +586,31 @@ class Toggler {
             (actSet ? (1 << 6) : 0) | //         b6: clear/set
             i.toUnsigned(6)); //             b5..b0: item index
     final oldS = state();
+    if (done) oldS.markDone(); // fix and after should know
     if (fix != null) {
       oldS.ds |= 1 << _bf; // mark held
       oldS.rg = 0; // clearSignal mask
       oldS.chb = sigm; // if on signal
       _oldS = oldS;
-      if (done) oldS.markDone(); // fix and after should know
-      final newS = Toggler(
-          bits: isDs ? bits : nEW, ds: isDs ? nEW : ds, rg: rg, hh: nhh);
+      final newS = sigm != 0
+          ? Toggler(bits: bits, ds: ds, rg: rg, hh: nhh)
+          : Toggler(
+              bits: isDs ? bits : nEW, ds: isDs ? nEW : ds, rg: rg, hh: nhh);
       newS.chb = isDs ? ds ^ nEW : bits ^ nEW; // pass coming single change bit
+      if (sigm != 0) {
+        oldS.hh = oldS.hh.toUnsigned(16) | (i >> 8) << 16; // place tag
+        if (done) oldS.markDone();
+      }
+
       if (fix!(oldS, newS)) {
-        // how it possibly could happen now?. Only if user code manipulated hh.
-        assert(hh & _mAll == oldS.hh & _mAll, 'State data race detected!');
         bits = newS.bits;
         ds = newS.ds; // held no longer
         hh = newS.hh; // may come with 'done' flag set by fix
         rg = newS.rg; //
-        // (incoming signals | computed changes) & clamp & ~clearSignal
+        // (inc. signals | old->new changes ) & clamp & ~clearSignal
         chb = ((oldS.chb | (bits ^ oldS.bits) | (ds ^ oldS.ds)) &
             _mAll &
             ~oldS.rg);
-        /*/
-        print('  ored: chbO ${oldS.chb}|${bits ^ oldS.bits}|${ds ^ oldS.ds}');
-        print('   and: chbN ${_ph(~newS.chb & _mSBi)} & ${_ph(_mSBi)}');
-        print('  chbs: chbO ${_ph(oldS.chb)} : chbN ${_ph(newS.chb)}');
-        */
       }
     } else {
       hh = nhh; // new serial

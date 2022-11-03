@@ -9,7 +9,7 @@ With ultimate goal of it being as safe as _Reactive_ setups but without hundreds
 
 Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (195 of 195 lines)`
+Test coverage: `100.0% (200 of 200 lines)`
 
 ## Why should I use this for app state managnment?
 
