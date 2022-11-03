@@ -1,16 +1,17 @@
 // ignore_for_file: avoid_print
 
-import 'package:toggler/toggler.dart';
-
 /// You may scaffold your tg_names.dart by running this script:
 /// \$> dart run tool/print_named_indice.dart > lib/src/tg_names.dart
 
-bool model = false;
+enum Kind { model, bits, none }
+
+Kind sel = Kind.none;
 bool bare = false;
-int start = 10;
+bool wnum = false;
+bool uhlp = false;
 int count = 16;
-int max = 52;
-int nMax = 52;
+int start = 0;
+int max = 0;
 int min = 0;
 String core = 'ReNameMe';
 String sufix = '';
@@ -20,7 +21,15 @@ var names = <String>[];
 void main(List<String> argi) {
   for (final arg in argi) {
     if (arg == 'model') {
-      model = true;
+      start = 100;
+      max = 255;
+      sel = Kind.model;
+      continue;
+    }
+    if (arg == 'bits') {
+      start = 0;
+      max = 52;
+      sel = Kind.bits;
       continue;
     }
     if (arg == 'bare') {
@@ -51,50 +60,54 @@ void main(List<String> argi) {
       core = arg.substring(5);
       continue;
     }
+    if (arg.contains(RegExp('addnum'))) {
+      wnum = true;
+      continue;
+    }
     if (arg.contains(RegExp('-h'))) {
-      help();
-      return;
+      uhlp = true;
+      continue;
     }
     if (arg.codeUnitAt(0) < 0x5b && arg.codeUnitAt(0) > 0x40) names.add(arg);
   }
-  if (model) {
-    min = 128;
-    nMax = 256;
-    max = max > nMax ? nMax : max;
-    max = max < min ? nMax : max;
-    sane();
-    models();
-  } else {
-    min = 0;
-    nMax = 52;
-    sane();
-    tgBits();
+  if (uhlp) sel = Kind.none;
+  switch (sel) {
+    case Kind.model:
+      max = 255;
+      if (start < 64) {
+        print('// BEWARE: model indice in bits-indice range!');
+      }
+      models();
+      break;
+    case Kind.bits:
+      max = 52;
+      start = start > max ? max - 1 : start;
+      count = start + count > max ? max - start : count;
+      tgBits();
+      break;
+    case Kind.none:
+      help();
+      break;
   }
-}
-
-void sane() {
-  max = max < min ? min : max;
-  max = max > nMax ? nMax : max;
-  start = start < min ? min : start;
-  start = start > nMax ? nMax : start;
-  count = start + count > nMax ? nMax - start : count;
-  start = start < min ? min : start;
 }
 
 void help() {
   print('''
-Usage: [model] [opts] [NameA NameB...]
- default  print bit indice and their select mask
+Usage: bits|model [opts] [NameA NameB...]
+    bits  print bit indice and their select mask
    model  print model indice
-          if Names are given print using them, for their count:
-          Name must begin with A-Z ascii character
+
+  If Names are given print using them, for their count.
+  Name must begin with A-Z ascii character. It will be prefixed with Toggler
+  defaults: b for bit index, s for select bit mask, m for model index.
  opts:
       max:$max\tnot above this number
-    start:0\tfrom this number. For "model" default is 128
+    start:$start\tfrom this number
     count:$count\tthat many
    prefix:$prefix\tadd prefix
     sufix:$sufix\tadd sufix
-     core:$core; (search-replace template)
+     core:$core - A single name for search-replace later
+   addnum: add tailing numbers to user provided names
 ''');
 }
 
@@ -102,7 +115,7 @@ void models() {
   if (names.isNotEmpty) {
     int n = start;
     for (final v in names) {
-      print('const m$prefix$v$sufix = $n;');
+      print('const m$prefix$v${wnum ? n : ''}$sufix = $n;');
       n++;
       if (n > max) {
         print('// ----------- max:$max reached, can not continue ------------');
@@ -117,26 +130,22 @@ void models() {
 }
 
 void tgBits() {
-  if (!bare) {
+  if (!bare && names.isEmpty) {
     print('''
 // Toggler works best with named indice. You generated them, hopefully to
 // conventional 'tg_names.dart' file. Now you should make use of your editor
 // select consecutive two lines and rename "ReNameMe#" (no b and s prefice!)
 // to any meaningful name you want. Enjoy!
-
-// keep bFreeIndex updated to be 1 over your last renamed index''');
-    print('const bFreeIndex = ${max + 1};');
-    print('// then sAll mask will cover just bits you use, not more');
-    print('const sAll = (1 << bFreeIndex) - 1;');
-    print('const sNone = 0;');
+''');
     print(
         "// rename below with 'search & replace' to keep 'b' and 's' prefixes ");
   }
+  int n = start;
   if (names.isNotEmpty) {
-    int n = start;
     for (final v in names) {
-      print('const b$prefix$v$sufix = $n;');
-      print('const s$prefix$v$sufix = 1 << b$prefix$v$sufix;');
+      final cna = '$prefix$v${wnum ? n : ''}$sufix';
+      print('const b$cna = $n;');
+      print('const s$cna = 1 << b$cna;');
       n++;
       if (n > max) {
         print('// ----------- max:$max reached, can not continue ------------');
@@ -144,9 +153,18 @@ void tgBits() {
       }
     }
   } else {
-    for (int n = start; n <= start + count; n++) {
+    for (n = start; n <= start + count; n++) {
       print('const b$prefix$core$n$sufix = $n;');
       print('const s$prefix$core$n$sufix = 1 << b$prefix$core$n$sufix;');
     }
+  }
+  if (!bare && names.isEmpty) {
+    print('''
+// keep bFreeIndex updated to be 1 over your last bit index
+// then sAll mask will cover just bits you use, not more
+    const bFreeIndex = $n;
+    const sAll = (1 << bFreeIndex) - 1;
+    const sNone = 0;'
+''');
   }
 }
