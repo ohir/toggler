@@ -9,6 +9,7 @@ class TCNo extends ToggledNotifier {
   int seen = 0;
   @override
   void pump(int chb) => seen = chb;
+  void reset() => seen = 0;
 }
 
 /// toggles on setting val to > 10, otherwise signals
@@ -33,6 +34,7 @@ void main() {
     setUp(() {
       flags.bits = flags.hh = flags.ds = flags.rg = flags.chb = 0;
       flags.fix = flags.after = null;
+      flags.notifier = flags.after = flags.fix = null;
     });
 
     test('Set 0 Max', () {
@@ -43,6 +45,16 @@ void main() {
       flags.set0(0);
       flags.set0(bIndexMax);
       expect(!flags[0] && !flags[bIndexMax], isTrue);
+    });
+    test('Disable/enable 0 Max', () {
+      flags.disable(0);
+      expect(flags.active(0), isFalse);
+      flags.disable(bIndexMax);
+      expect(flags.active(bIndexMax), isFalse);
+      flags.enable(0);
+      expect(flags.active(0), isTrue);
+      flags.enable(bIndexMax);
+      expect(flags.active(bIndexMax), isTrue);
     });
     test('Is Set in range set boundry', () {
       flags.set1(7);
@@ -100,16 +112,16 @@ void main() {
       flags.set1(bIndexMax - 1, ifActive: true);
       expect(flags[bIndexMax - 1], isTrue);
     });
-    test('DisableEnable 33', () {
-      flags.set1(33, ifActive: true);
-      flags.disable(33);
-      flags.set0(33, ifActive: true);
-      expect(flags[33], isTrue);
-      flags.setTo(33, false, ifActive: true);
-      expect(flags[33], isTrue);
-      flags.enable(33);
-      flags.set0(33, ifActive: true);
-      expect(flags[33], isFalse);
+    test('DisableEnable bIndexMax', () {
+      flags.set1(bIndexMax, ifActive: true);
+      flags.disable(bIndexMax);
+      flags.set0(bIndexMax, ifActive: true);
+      expect(flags[bIndexMax], isTrue);
+      flags.setTo(bIndexMax, false, ifActive: true);
+      expect(flags[bIndexMax], isTrue);
+      flags.enable(bIndexMax);
+      flags.set0(bIndexMax, ifActive: true);
+      expect(flags[bIndexMax], isFalse);
     });
     test('Toggle 0', () {
       flags.disable(0);
@@ -144,7 +156,7 @@ void main() {
       expect(c4.isOlderThan(cL2), isTrue); // copy to live, always true
 
       c0.set1(15);
-      c1.set1(33);
+      c1.set1(bIndexMax);
       expect(c0.hh == c1.hh, isTrue); // copies may not alter history
       expect(c0.serial == c1.serial, isTrue);
       expect(c0.recent == c1.recent, isTrue);
@@ -168,6 +180,7 @@ void main() {
           isTrue);
     });
     test('Change mask A', () {
+      flags.notifier = TCNo(); // now only live objects update chb
       flags.set1(0);
       expect(flags.chb == 1, isTrue);
       flags.set1(10);
@@ -179,9 +192,9 @@ void main() {
       expect(flags.changed(1 << 10), isTrue);
       expect(flags.changed(1 << 11), isFalse);
       flags.set1(11);
-      flags.set1(33);
-      flags.disable(51); // cm must reflect any change at index
-      expect(flags.chb == 1 << 51, isTrue);
+      flags.set1(bIndexMax - 1);
+      flags.disable(bIndexMax); // cm must reflect any change at index
+      expect(flags.chb == 1 << bIndexMax, isTrue);
     });
     test('Change mask B', () {
       bool cf(Toggler o, Toggler n) {
@@ -209,9 +222,9 @@ void main() {
       expect(c1.differsFrom(flags, bFirst: 9, bLast: 22), isFalse);
       expect(c1.differsFrom(flags, bFirst: 9, bLast: 23), isTrue);
     });
-    test('Set 63 | should throw', () {
+    test('Set flag position | should throw', () {
       expect(() {
-        flags.set1(63);
+        flags.set1(bIndexMax + 1);
       }, throwsAssertionError);
     });
     test('Set -1 | should throw', () {
@@ -300,30 +313,32 @@ void main() {
       expect(flags.done, isTrue);
     });
     test('Demand bad diff| should throw', () {
+      expect(bIndexMax, equals(62));
       expect(() {
-        flags.differsFrom(flags.state(), bLast: 63);
+        flags.differsFrom(flags.state(), bLast: bIndexMax + 1);
       }, throwsAssertionError);
     });
   });
   group('Done and history :: ', () {
-    int ntlast = 0;
-    int filast = 0;
-    void chnote(Toggler oS, Toggler nS) => ntlast++;
+    int ntCnt = 0;
+    int fixCnt = 0;
+    void chnote(TransientState oS, Toggler nS) => ntCnt++;
 
-    bool chfix(Toggler oS, Toggler nS) {
-      filast++;
+    bool chfix(Toggler oS, TransientState nS) {
+      fixCnt++;
       return true;
     }
 
-    final flags = Toggler();
-    const ohh = 7777777777;
+    Toggler flags = Toggler();
+    const ohh = 0xabcdef0000;
     setUp(() {
-      flags.bits = flags.hh = flags.ds = flags.rg = flags.chb = 0;
+      // flags.bits = flags.hh = flags.ds = flags.rg = flags.chb = 0;
+      flags = Toggler();
       flags.hh = ohh;
       flags.fix = chfix;
       flags.after = chnote;
-      ntlast = 0;
-      filast = 0;
+      ntCnt = 0;
+      fixCnt = 0;
     });
 
     test('no history changes', () {
@@ -339,12 +354,6 @@ void main() {
       expect(flags.done, isTrue);
       expect(c1.done, isFalse);
     });
-    test('done is cleared with clone', () {
-      flags.markDone();
-      final c1 = flags.clone();
-      expect(flags.done, isTrue);
-      expect(c1.done, isFalse);
-    });
     test('done is cleared on copy of copy', () {
       final c1 = flags.state();
       c1.done = true;
@@ -357,13 +366,13 @@ void main() {
       flags.toggle(5);
       expect(flags[5], isTrue);
       expect(flags.hh != ohh, isTrue);
-      expect(filast, equals(1));
+      expect(fixCnt, equals(1));
     });
     test('history changes with just notify', () {
       flags.fix = null;
       flags.toggle(5);
       expect(flags[5] && flags.hh != ohh, isTrue);
-      expect(ntlast, equals(1));
+      expect(ntCnt, equals(1));
     });
     test('history changes with just notifier', () {
       flags.fix = null;
@@ -378,14 +387,27 @@ void main() {
       flags.markDone();
       expect(flags.done, isTrue);
       flags.toggle(5);
+      expect(flags[5], isTrue);
       expect(flags.done, isFalse);
       flags.done = true;
       expect(flags.done, isTrue);
       flags.toggle(5);
+      expect(flags[5], isFalse);
       expect(flags.done, isFalse);
-      expect(!flags[5] && flags.hh != ohh, isTrue);
-      expect(ntlast, equals(0));
-      expect(filast, equals(2));
+      expect(fixCnt, equals(2));
+      expect(ntCnt, equals(0));
+      flags.disable(0);
+      expect(flags.active(0), isFalse);
+      expect(fixCnt, equals(3));
+      flags.disable(bIndexMax);
+      expect(flags.active(bIndexMax), isFalse);
+      expect(fixCnt, equals(4));
+      flags.enable(0);
+      expect(flags.active(0), isTrue);
+      expect(fixCnt, equals(5));
+      flags.enable(bIndexMax);
+      expect(flags.active(bIndexMax), isTrue);
+      expect(fixCnt, equals(6));
     });
     test('done is cleared on notify only', () {
       flags.fix = null;
@@ -399,8 +421,8 @@ void main() {
       flags.toggle(5);
       expect(flags.done, isFalse);
       expect(!flags[5] && flags.hh != ohh, isTrue);
-      expect(ntlast, equals(2));
-      expect(filast, equals(0));
+      expect(ntCnt, equals(2));
+      expect(fixCnt, equals(0));
     });
     test('done is cleared on notifier only', () {
       flags.fix = null;
@@ -431,30 +453,24 @@ void main() {
       flags.fix = null;
       flags.notifier = noo;
       flags.toggle(5);
-      expect(flags.chb == noo.seen, isFalse);
+      expect(flags.chb, equals(32));
       expect(noo.seen, equals(0));
-    });
-    test('brand may not change with history', () {
-      flags.hh = 0xff << 8;
-      flags.toggle(49);
-      flags.toggle(50);
-      flags.toggle(51);
-      expect(flags.hh >> 8 == 0x3ff, isTrue);
     });
     test('live state on hold may never change', () {
       final flags = Toggler();
-      expect(flags.fixed, isTrue);
+      expect(flags.isFixed, isTrue);
       flags.fix = null;
       flags.after = null;
       var noo = TCNo();
       flags.notifier = noo;
       flags.hold();
+      expect(flags.held, isTrue);
       flags.set1(5);
       expect(noo.seen, equals(0));
       expect(flags.bits, equals(0));
       flags.resume();
       flags.toggle(5);
-      expect(flags.fixed, isTrue);
+      expect(flags.isFixed, isTrue);
       expect(flags.chb == noo.seen, isTrue);
       expect(noo.seen, equals(1 << 5));
     });
@@ -468,10 +484,11 @@ void main() {
     late Model m2;
     int last = 0;
     int fixes = 0;
-    void chnote(Toggler oS, Toggler cS) => last++;
-
-    bool chfix(Toggler oS, Toggler nS) {
+    void chnote(TransientState oS, Toggler cS) => last++;
+    bool chfix(Toggler oS, TransientState nS) {
       fixes++;
+      last++;
+      expect(nS.signalTag, equals(0));
       return true;
     }
 
@@ -480,6 +497,7 @@ void main() {
       m0 = Model(0, flags);
       m1 = Model(1, flags);
       m2 = Model(2, flags);
+      fixes = last = 0;
     });
     test('Simple Signals', () {
       m0.val = 2;
@@ -490,28 +508,102 @@ void main() {
       m2.val = 1;
       expect(flags.chb, equals(4));
     });
-    test('set value on fix throws', () {
-      bool cf(Toggler oS, Toggler nS) {
-        expect(flags.signalsComing, equals(1));
-        m1.val = 1;
-        expect(flags.signalsComing, equals(3));
-        m2.val = 11;
-        expect(flags.signalsComing, equals(7));
+    test('Returning signal', () {
+      void bk() => flags.signal(5);
+      Toggler cpy = Toggler();
+      int bkval = 0;
+      bool cf(Toggler oS, TransientState nS) {
+        bk();
+        oS.copyStateTo(cpy);
+        bkval = nS.signals;
         return true;
       }
 
       flags.fix = cf;
-      expect(() => m0.val = 2, throwsAssertionError);
+      flags.set1(0);
+      flags.disable(1);
+      expect(flags.bits, equals(1));
+      expect(flags.ds, equals(2));
+      expect(bkval, equals(32));
+    });
+    test('Returning set1', () {
+      void bk() => flags.set1(5); // b5
+      Toggler cpy = Toggler();
+      int bkval = 0;
+      bool cf(Toggler oS, TransientState nS) {
+        oS.copyStateTo(cpy);
+        expect(flags.bits, equals(0));
+        expect(oS.bits, equals(0));
+        bk(); // 32
+        expect(oS.bits, equals(0));
+        bkval = nS.bits;
+        return true;
+      }
+
+      flags.fix = cf;
+      expect(flags.bits, equals(0));
+      flags.set1(0); // 5 + 0 -> 33
+      // flags.disable(1);
+      expect(flags.bits, equals(33));
+      //expect(flags.ds, equals(2));
+      expect(bkval, equals(33)); // +b0
+    });
+    test('Returning set0', () {
+      Toggler flags = Toggler(bits: 36); // b5 b2
+      int fired = 0;
+      void bk() => flags[5] = false;
+      bool cf(Toggler oS, TransientState nS) {
+        expect(fired, equals(0));
+        expect(nS.bits, equals(37));
+        bk(); // b5->0
+        expect(nS.bits, equals(5));
+        fired++;
+        return true;
+      }
+
+      flags.fix = cf;
+      flags.set1(0);
+      expect(flags.bits, equals(5)); // !32+4+1
+    });
+    test('Returning disable', () {
+      Toggler flags = Toggler(bits: 8, ds: 8);
+      void bk() => flags.disable(0);
+      int bkval = 0;
+      bool cf(Toggler oS, TransientState nS) {
+        bk();
+        bkval = nS.ds;
+        return true;
+      }
+
+      flags.fix = cf;
+      flags.set1(0);
+      expect(flags.bits, equals(9)); // 8+1
+      expect(flags.ds, equals(9)); // 8+1
+      expect(bkval, equals(9)); // -b5
+    });
+    test('Modify from after', () {
+      Toggler flags = Toggler(bits: 8, ds: 8);
+      void bk(int what) {
+        if (what == 0) flags.set0(0);
+        if (what == 1) flags.set1(0);
+        if (what == 2) flags.disable(0);
+      }
+
+      void af(TransientState oS, Toggler cur) => bk(cur.recent);
+      flags.after = af;
+      expect(() => flags.set1(1), throwsAssertionError);
+      expect(() => flags.set0(0), throwsAssertionError);
+      expect(() => flags.disable(2), throwsAssertionError);
     });
 
     test('outer signal makes to us', () {
       int fixes = 0;
-      bool cf(Toggler oS, Toggler nS) {
-        expect(oS.signalsComing, equals(1));
+      bool cf(Toggler oS, TransientState nS) {
+        expect(nS.signals, equals(1));
         m1.val = 1;
-        expect(oS.signalsComing, equals(3));
+        expect(nS.signals, equals(3));
         m2.val = 2;
-        expect(oS.signalsComing, equals(7));
+        expect(nS.signals, equals(7));
         fixes++;
         return true;
       }
@@ -525,14 +617,14 @@ void main() {
 
     test('fixSignal works', () {
       int fixes = 0;
-      bool cf(Toggler oS, Toggler nS) {
-        expect(oS.signalsComing, equals(1));
+      bool cf(Toggler oS, TransientState nS) {
+        expect(nS.signals, equals(1));
         m1.val = 1;
-        expect(oS.signalsComing, equals(3));
+        expect(nS.signals, equals(3));
         m2.val = 2;
-        expect(oS.signalsComing, equals(7));
-        oS.fixSignal(1, false); // clear 2
-        oS.fixSignal(4, true); // set 16
+        expect(nS.signals, equals(7));
+        nS.fixOutSignal(1, false); // clear 2
+        nS.fixOutSignal(4, true); // set 16
         fixes++;
         return true;
       }
@@ -545,18 +637,21 @@ void main() {
     });
   });
 
-  group('FixNotifyRaces :: ', () {
+  group('FixNotify :: ', () {
     int last = 0;
-    void chnote(Toggler oS, Toggler nS) => last++;
+    void chnote(TransientState oS, Toggler nS) => last++;
 
-    bool chfix(Toggler oS, Toggler nS) {
-      if (oS.recent == 25) {
-        oS.hh <<= 1; // test abandon older state
-      }
+    bool chfix(Toggler oS, TransientState nS) {
       oS.differsFrom(nS, bFirst: 11, bLast: 16); // cover !differs path
       if (nS[1] && nS.differsFrom(oS)) nS.set1(0); // test state fixing on 1
-      if (nS[7] && nS.differsFrom(oS)) nS.markDone(); // test skip notify on 7
+      if (nS[7] && nS.differsFrom(oS)) {
+        nS.skipAfterAndNotify(); // test skip notify on 7
+      }
       if (nS[9] && nS.differsFrom(oS)) nS.done = true; // test skip notify on 9
+      if (nS[8]) {
+        nS[14] = true;
+        nS[14] = false;
+      }
       return true;
     }
 
@@ -575,25 +670,101 @@ void main() {
       expect(last == 2, isTrue);
       expect(flags[0] && flags[1], isTrue);
     });
-    test('Notify via clone', () {
-      var nf = flags.clone();
-      nf.set1(5);
-      expect(nf[5] && !flags[5], isTrue);
-      expect(last == 3, isTrue);
+    test('Add to newS', () {
+      last = 1;
+      flags.set1(8);
+      expect(last, equals(2));
+      expect(flags[8], isTrue);
+      expect(flags[14], isFalse);
     });
-    test('Internal fix', () {
+    test('Set newS.done skips notify', () {
+      last = 3;
       flags.set1(7);
-      expect(last == 3, isTrue); // notify skipped, setDone()
+      expect(last, equals(3)); // notify skipped, setDone()
       flags.set1(9);
-      expect(last == 3, isTrue); // notify skipped, done = true
+      expect(last, equals(3)); // notify skipped, setDone()
     });
-    /* With signals reentrant setter throws early! So no races below.
-    test('Make artificial race | should throw', () {
-      expect(() {
-        flags.set1(25);
-        flags.set1(0);
-      }, throwsAssertionError);
-    });*/
+    test('on hold works', () {
+      last = 0;
+      flags.set1(6);
+      flags.hold();
+      flags.set1(2);
+      flags.set1(3);
+      flags.set1(4);
+      flags.resume();
+      expect(last, equals(1));
+      expect(flags.bits, equals(64));
+    });
+  });
+  group('OldState :: ', () {
+    late Toggler flags;
+
+    setUp(() {
+      flags = Toggler();
+    });
+    test('Serial, supress', () {
+      flags.fix = (Toggler oS, TransientState nS) {
+        nS.bits = 0x17f; // b8 ~b7 b6..b0
+        // signal 9              b9 -> 1
+        flags.signal(7); //      b7 -> 1
+        nS.supressOutAt(8); //   b8 -> 0
+        nS.clearComingAt(9); // !b9
+        //                       255
+        expect(nS.signalTag, equals(33)); // tag 33
+        expect(nS.serial, equals(0)); // but serial 0
+        return true;
+      };
+      flags.signal(8, tag: 33);
+      expect(flags.chb, equals(255));
+    });
+    test('bad set on live', () {
+      flags.fix = (Toggler oS, TransientState nS) {
+        expect(nS.bits, equals(0));
+        expect(nS[10], isFalse);
+        oS[10] = true; // should pass to nS
+        expect(nS[10], isTrue);
+        nS.set1(0);
+        return true;
+      };
+      expect(flags.bits, equals(0));
+      flags.signal(8, tag: 33);
+      expect(flags.bits, equals(1025)); // 10 + 0
+    });
+    test('Set1', () {
+      // (OldState oS, Toggler nS) => ;
+      flags.fix = (Toggler oS, TransientState nS) {
+        nS.set1(oS.recent); //        b0  1
+        nS.set1(nS.recent); //        b1  2
+        nS.set1(nS.recent + 1); //    b2  4
+        nS.set1(nS.recent + 2); //    b3  8
+        //                           --- 15
+        nS.fixOutSignal(2, false); //   ~b2  4 -> 0
+        nS.fixOutSignal(4, true); //     b4   -> 16
+        nS.disable(nS.signalTag); // b11 -> 2048
+        flags.signal(2, tag: 33); // ------ 2067
+        flags.signal(3, tag: 61); //  b3 -> 8
+        //                           ------ 2075
+        expect(nS.signalTag, equals(11)); // only firing
+        expect(nS.recent, equals(1));
+        return true;
+      };
+      flags.signal(1, tag: 11);
+      expect(flags.error, isFalse);
+      expect(flags.active(11), isFalse);
+      expect(flags.bits, equals(15));
+      expect(flags.chb, equals(2075)); // b11,
+    });
+    test('Break fuse', () {
+      flags.after = (TransientState oS, Toggler nS) {
+        flags.signal(5);
+      };
+      flags.fix = (Toggler oS, TransientState nS) {
+        flags.signal(7); //      b7 -> 1
+        return true;
+      };
+      // expect(() => flags.set1(8), returnsNormally);
+      expect(() => flags.set1(8), throwsAssertionError);
+    });
   });
 }
 
