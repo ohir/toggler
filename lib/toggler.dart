@@ -23,7 +23,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (199 of 199 lines)
+/// Test coverage: **100.0%** (202 of 202 lines)
 library toggler;
 
 // this woodoo is insane
@@ -473,8 +473,9 @@ class Toggler {
   // int numAt(int sIndex) => (ds >> sIndex) << 1 | bits >> sIndex;
 
   // =========================== Signal api ===============================
-  /// keeps TransientState state copy (externally mutable) for the `fix` run.
-  TransientState? _tranS;
+  // TransientState is a state copy (externally mutable) for the `fix` run.
+  TransientState? _trs; // instance
+  TransientState? _tranS; // in use
 
   /// signal some change at `bIndex`. A noop if there is no `fix` handler attached.
   /// Except for first (aka firing) signal, any number of others coming at the
@@ -534,8 +535,8 @@ class Toggler {
 
   /// not registering setter for state bits, for use from user `fix` code
   ///
-  /// Note non registering setter is not radio-group aware. Ie. calling this may
-  /// set more than one bit on a radio-group.
+  /// Note that non registering setter is not radio-group aware. Ie. calling
+  /// this may set more than one bit on a radio-group.
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
   void fixBits(int bIndex, bool to) =>
@@ -565,19 +566,24 @@ class Toggler {
             (isDs ? (1 << 7) : 0) | // b7: tg/ds
             (to1 ? (1 << 6) : 0) | //  b6: to0/to1
             bIndex); //            b5..b0: item index
-    final tranS = isSig
-        ? TransientState(
-            bits: bits, ds: ds, rg: rg, hh: (nEW << 16 | (nhh & 0x1ff))) // tag
-        : TransientState(
-            chb: isDs ? ds ^ nEW : bits ^ nEW,
-            bits: isDs ? bits : nEW,
-            ds: isDs ? nEW : ds,
-            rg: rg,
-            hh: nhh & 0x1ff, // tag zero
-          ); // newState
-    tranS.hh |= hh & (_fdone | _ferr); // let fix know
-    _tranS = tranS;
-
+    // singleton transient state
+    _trs ??= TransientState();
+    if (isSig) {
+      _trs!.bits = bits;
+      _trs!.ds = ds;
+      _trs!.hh = (nEW << 16 | (nhh & 0x1ff)); // tag
+      _trs!.chb = 0;
+    } else {
+      _trs!.bits = isDs ? bits : nEW;
+      _trs!.ds = isDs ? nEW : ds;
+      _trs!.hh = nhh & 0x1ff; // tag zero
+      _trs!.chb = isDs ? ds ^ nEW : bits ^ nEW;
+    }
+    _trs!.signals = 0;
+    _trs!.supress = 0;
+    _trs!.rg = rg;
+    _tranS = _trs;
+    final tranS = _tranS!;
     if (fix != null) {
       tranS.signals = isSig ? 1 << bIndex : 0; // mark if on signal
       if (fix!(this, tranS)) {
@@ -628,17 +634,11 @@ class Toggler {
 /// round and modify or supress "out" signals that will be passed to `after`
 /// then to `notifier` once `fix` ends.
 ///
-/// _Beware! a bloat of foolproofing checks was removed, so you certainly MAY
-/// now make trouble for yourself eg. by assigning TransientState object a `fix` or
-/// `notifier`, or modifying snapshot state.  Do not do that!_.
+/// _Beware! a bloat of foolproofing checks was removed, so you certainly now MAY
+/// make troubles for yourself eg. by assigning TransientState object a `fix` or
+/// `notifier`, or side-modifying state through a reference.  Do not do that!_.
 class TransientState extends Toggler {
-  TransientState({
-    required super.bits,
-    required super.ds,
-    super.rg,
-    super.hh,
-    super.chb,
-  });
+  // TransientState({ super.bits, super.ds, super.rg, super.hh, super.chb, });
 
   /// Non-zero if `fix` ran on a signal, or if signals came during a `fix`
   /// run. Has 1 at signalled bIndex position(s).
