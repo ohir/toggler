@@ -301,17 +301,6 @@ class Toggler {
   /// disable item at _bIndex_.
   void disable(int bIndex) => setDS(bIndex, true);
 
-  /* retracted
-  // _true_ if other copy has been created after us. A _live_ Toggler object
-  /// (one with a handler and/or notifier) can never be older than a copy or
-  /// other live Toggler.
-  bool isOlderThan(Toggler other) => _live
-      ? false
-      : other._live
-          ? true
-          : hh >> 16 < other.hh >> 16;
-          */
-
   /// radioGroup declares a range of items that have "one of" behaviour.
   /// Ranges may not overlap nor even be adjacent. Ie. there must be at least
   /// one non-grouped item placed between two radio groups. Eg. ranges 0..3 and
@@ -711,7 +700,7 @@ typedef TogglerStateFixer = bool Function(
 typedef TogglerAfterChange = void Function(Toggler commitedState);
 
 // coverage:ignore-start
-/// Convenience superclass for _Models_ having Toggler as a msr.
+/// Convenience superclass for _Models_ having Toggler as an msr.
 /// Not a mixin.
 abstract class ModelStateRegister {
   final Toggler msr = Toggler();
