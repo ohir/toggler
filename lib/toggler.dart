@@ -23,7 +23,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (202 of 202 lines)
+/// Test coverage: **100.0%** (200 of 200 lines)
 library toggler;
 
 // this woodoo is insane
@@ -301,7 +301,8 @@ class Toggler {
   /// disable item at _bIndex_.
   void disable(int bIndex) => setDS(bIndex, true);
 
-  /// _true_ if other copy has been created after us. A _live_ Toggler object
+  /* retracted
+  // _true_ if other copy has been created after us. A _live_ Toggler object
   /// (one with a handler and/or notifier) can never be older than a copy or
   /// other live Toggler.
   bool isOlderThan(Toggler other) => _live
@@ -309,6 +310,7 @@ class Toggler {
       : other._live
           ? true
           : hh >> 16 < other.hh >> 16;
+          */
 
   /// radioGroup declares a range of items that have "one of" behaviour.
   /// Ranges may not overlap nor even be adjacent. Ie. there must be at least
@@ -593,6 +595,10 @@ class Toggler {
             ~tranS.supress);
         bits = tranS.bits; // commit state
         ds = tranS.ds; // commit state
+      } else {
+        // hh &= ~(_ferr | _fdone); Let fix decide about flags
+        _tranS = null;
+        return; // abandon changes
       }
     } else {
       chb = isDs ? ds ^ nEW : bits ^ nEW;
@@ -602,7 +608,7 @@ class Toggler {
     tranS.hh |= _fheld; // to catch late signals during after and notify phases
     if (tranS.hh & _finish != 0) {
     } else if (after != null) {
-      after!(tranS, this);
+      after!(this);
     } else if (notifier != null) {
       notifier!.pump(chb);
     }
@@ -702,10 +708,24 @@ typedef TogglerStateFixer = bool Function(
     Toggler liveState, TransientState newState);
 
 /// `after` function signature
-typedef TogglerAfterChange = void Function(
-    TransientState commitedState, Toggler current);
+typedef TogglerAfterChange = void Function(Toggler commitedState);
 
 // coverage:ignore-start
+/// Convenience superclass for _Models_ having Toggler as a msr.
+/// Not a mixin.
+abstract class ModelStateRegister {
+  final Toggler msr = Toggler();
+  ModelStateRegister({
+    TogglerStateFixer? fix,
+    TogglerAfterChange? after,
+    ToggledNotifier? notifier,
+  }) {
+    msr.fix = fix;
+    msr.after = after;
+    msr.notifier = notifier;
+  }
+}
+
 /// Toggler's change notification dispatcher, an abstract interface.
 /// Concrete implementation can be found eg. in `package:uimodel/uimodel.dart`
 abstract class ToggledNotifier {

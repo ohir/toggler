@@ -18,7 +18,7 @@ const biNameE = 5;
 const biNameF = 6;
 
 void main() {
-  void ourAfterHandler(_, Toggler cu) {
+  void ourAfterHandler(Toggler cu) {
     var tg = '    set: ';
     var ds = ' active: ';
     for (int i = 0; i < 27; i++) {
@@ -81,7 +81,7 @@ void main() {
   flags.set1(biNameD);
 }
 
-extension TogglerNums on Toggler {
+extension TogglerExt on Toggler {
   /// returns item at sIndex state as 0..3 int of b1:ds b0:tg
   /// for use with `switch`.
   // int numAt(int sIndex) => (ds >> sIndex) << 1 | bits >> sIndex;
