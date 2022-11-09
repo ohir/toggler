@@ -133,33 +133,28 @@ void main() {
       expect(flags[0], isFalse);
     });
     // test('name ', () {});
-    test('generational behaviour [A]', () {
-      var cLive = Toggler(after: (Toggler a, Toggler b) => a.isOlderThan(b));
+    test('serial must go up on live', () {
+      var cLive = Toggler(fix: (liveState, newState) => true);
       var c0 = cLive.state();
       var c1 = cLive.state();
-      cLive.set1(7);
+      cLive[7] = true;
       var c2 = cLive.state();
-      cLive.set0(1);
-      expect(c0.isOlderThan(c1), isFalse); // copy to copy
-      expect(c1.isOlderThan(c2), isTrue); // copy to copy
-      expect(c2.isOlderThan(c1), isFalse); // copy to copy
-      expect(c2.isOlderThan(c2), isFalse); // copy to copy
-    });
-    test('generational behaviour [B]', () {
-      var cLive = Toggler(after: (Toggler a, Toggler b) {});
-      var c0 = cLive.state();
-      var c1 = cLive.state();
-      cLive.set1(7);
-      var cL2 = Toggler(after: (Toggler a, Toggler b) {});
-      var c4 = cLive.state();
-      expect(cLive.isOlderThan(cL2), isFalse); // live to live, always false
-      expect(c4.isOlderThan(cL2), isTrue); // copy to live, always true
-
-      c0.set1(15);
-      c1.set1(bIndexMax);
+      expect(cLive.recent, equals(7));
+      expect(c0.serial, equals(cLive.serial - 1));
+      c1[3] = true;
+      c2[9] = true;
       expect(c0.hh == c1.hh, isTrue); // copies may not alter history
-      expect(c0.serial == c1.serial, isTrue);
-      expect(c0.recent == c1.recent, isTrue);
+      expect(c0.serial, equals(c1.serial));
+      expect(c1.recent, equals(0));
+      expect(c2.recent, equals(7));
+    });
+    test('refused may not alter state', () {
+      var cLive = Toggler(fix: (liveState, newState) => false);
+      var c0 = cLive.state();
+      cLive[7] = true;
+      expect(cLive.hh, equals(c0.hh)); // refused may not alter
+      expect(cLive.ds, equals(c0.ds));
+      expect(cLive.bits, equals(c0.bits));
     });
     test('copy may not mutate history', () {
       var c0 = Toggler();
@@ -322,7 +317,7 @@ void main() {
   group('Done and history :: ', () {
     int ntCnt = 0;
     int fixCnt = 0;
-    void chnote(TransientState oS, Toggler nS) => ntCnt++;
+    void chnote(Toggler nS) => ntCnt++;
 
     bool chfix(Toggler oS, TransientState nS) {
       fixCnt++;
@@ -484,7 +479,7 @@ void main() {
     late Model m2;
     int last = 0;
     int fixes = 0;
-    void chnote(TransientState oS, Toggler cS) => last++;
+    void chnote(Toggler cS) => last++;
     bool chfix(Toggler oS, TransientState nS) {
       fixes++;
       last++;
@@ -589,7 +584,7 @@ void main() {
         if (what == 2) flags.disable(0);
       }
 
-      void af(TransientState oS, Toggler cur) => bk(cur.recent);
+      void af(Toggler cur) => bk(cur.recent);
       flags.after = af;
       expect(() => flags.set1(1), throwsAssertionError);
       expect(() => flags.set0(0), throwsAssertionError);
@@ -639,7 +634,7 @@ void main() {
 
   group('FixNotify :: ', () {
     int last = 0;
-    void chnote(TransientState oS, Toggler nS) => last++;
+    void chnote(Toggler nS) => last++;
 
     bool chfix(Toggler oS, TransientState nS) {
       oS.differsFrom(nS, bFirst: 11, bLast: 16); // cover !differs path
@@ -755,7 +750,7 @@ void main() {
       expect(flags.chb, equals(2075)); // b11,
     });
     test('Break fuse', () {
-      flags.after = (TransientState oS, Toggler nS) {
+      flags.after = (Toggler nS) {
         flags.signal(5);
       };
       flags.fix = (Toggler oS, TransientState nS) {

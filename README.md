@@ -9,7 +9,7 @@ Because Toggler based state machine transitions are fully synchronous, these are
 
 Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (202 of 202 lines)`
+Test coverage: `100.0% (200 of 200 lines)`
 
 ## Why should I use this for app state managnment?
 
@@ -99,13 +99,13 @@ _See example/flutter_example.dart for a complete app code._
 
 > Pre: Some property in your Model is mutated, eg. a background service just hinted Model with a new _NameString_. NameString setter then registers state change in Model's internal Toggler, eg. by calling `signal(bName)`. Then:
 
-1. `Toggle` setter changes a **single** state bit, (here one at `bName` index), this change is put on a `newState` object that is a _state copy_ of the Toggler, but with _bName_ bit toggled. A verbatim _state copy_ is taken as _tranState_, then both are passed to the state transition handler `fix(tranState, newState)`. The `fix` handler is the "business logic" function provided by you.
+1. `Toggle` setter changes a **single** state bit, (here one at `bName` index), this change is put on a `newState` object that is a _state copy_ of the Toggler, but with _bName_ bit toggled. Then both `liveState` and `newState` are passed to the state transition handler `fix(liveState, newState)`. The `fix` handler is the "business logic" function provided by you.
 2. `Fix` may test, validate and change _newState_ further, eg. setting the _bNameHintReceived_ flag, and clearing _bWaitingForNameHint_ one. When new state is properly set, `fix` returns _true_.
 3. then the _newState_ is commited to the Toggler, ie. it becomes its current (aka _live_) state. This is a state that outer world sees.
-4. Next, the `after(tranState, liveState)` handler (also provided by you) runs. It may not change anything further, but it may decide whether the outer world should know about the changes. If so, it may notify others by itself, then/or pass baton to the
+4. Next, the `after(JustCommitedLiveState)` handler (also provided by you) runs. It may not change anything further, but it may decide whether the outer world should know about the changes. If so, it may notify others by itself, then/or pass baton to the
 5. `notifier` object that informs its subscribers, if it has any. If there is no `after` handler installed, and `notifier` object is, its _pump(changes)_ method runs automatically on commit.
 6. World is notified, so it may react: the View layer may hide a progress spinner and show an edit field filled with just received _NameString_, background connection to the hint service may observe _bNameHintReceived_ then close, and so on.
-7. -> 1. State machine will run again at the next change that registers in Toggler.
+7. -> 1. State machine transition mill will run again at the next change that registers in Toggler.
 
 <!--
 -->
@@ -117,15 +117,15 @@ Skim over a below included api cheat-sheet for the rest.
 #### constructor:
 ```Dart
 Toggler({
-  fix? = onChange(tranState, newState) handler, 
-  after? = afterChange(tranState, liveState) handler,
+  fix? = onChange(liveState, newState) handler, 
+  after? = afterChange(JustCommitedLiveState) handler,
   notifier? = ToggledNotifier(),
   bits: 0, ds: 0, rg: 0, hh: 0, chb: 0, // internal registers are public too
 })
 ```
 - at least one state transition handler is needed to make a _live state_ Toggler. All other members can be given to default constructor, too - used eg. in saved state deserializer and tests. An all-defaults Toggler can be mutated at will, eg. in an explicit App state initializer. The `fix`, `after`, and `notifier` handlers can be attached later.
-- your code in `fix` may manipulate _newState_ at will, it even may assign a some predefined const values to the `bits` and/or `ds` properties of it. Usually `fix` is a Model's internal function so it may have access to all other pieces of your business logic (and/or of ViewModel logic). The `tranState` is a transition state object, a Toggler subclass. Its `bits` and `ds` initially are a copy of the _live state_. These may change, and be inspected, if sets or signals come to the _live state_ Toggler during its `fix` run.
-- your code in `after` may decide whether `notifier` should run, it may also do notifications by itself. Eg. if your legacy Widget code builds of StreamBuilder, `after` may feed the Stream just for it - passing the rest to the `notifier`.
+- your code in `fix` may manipulate _newState_ at will, it even may assign a some predefined const values to the `bits` and/or `ds` properties of it. Usually `fix` is a Model's internal function so it may have access to all other pieces of your business logic (and/or of ViewModel logic). The `newState` is a transition state object, a Toggler subclass. Its `bits` and `ds` initially are a copy of the _live state_. The `newState` may change during the `fix` run, either mutated directly or indirectly by a `fix` actions (indirectly: if sets or signals come back to the _live state_ from a synchronous code called by `fix` on this run).
+- your code in `after` is given just commited state, before anyone else will see it. `After` then may decide whether a `notifier` should run. `After` may also do notifications by itself. Eg. if your legacy Widget code builds of StreamBuilder, `after` may feed the Stream just for it - passing the rest to the `notifier`.
 - a `notifier` object usually comes from an associated library, but it can also be yours.
 
 #### factories:
@@ -157,7 +157,6 @@ Toggler({
 - `changedAt(bIndex)` tells if there was a change at _bIndex_
 - `anyOfSet({first, last, selmask})` _true_ if any item bit is set in range or by selmask
 - `differsFrom(other, {first, last, selmask})` compares this and other state (bits, ds)
-- `isOlderThan(other)` compares serial numbers of this and other
 
 #### diagnostics:
 - `error` _true_ if in release build Toggler method got a wrong index
@@ -198,10 +197,10 @@ _Follow the convention. Then if not you visually at writing, your linter later m
 
 - This library is synchronous so your handler methods should complete fast. Any interface with async code should be done via a proper state cycle (eg. in a separate Isolate). Ie. while your async code may easily register in Toggler, you should pass any changes back only using a `notifier`.
 
-- While `fix` runs the live Toggler state is on [hold]. It means that any further direct changes to the register are forbidden. Signals though work, so if your `fix` code mutates an external item that normally signals register about a change, this signal will come and it will be reflected at the _changed bits_ outgoing signal (unless you supress it within the `fix` handler).
+- While `fix` runs the live Toggler state is on [hold] but external changes and signals are coming directly to the `newState`. It means that all changes mad on the run will be reflected at the _changed bits_ outgoing signal. (unless you supress them from within the `fix`).
 
 #### promised longer intro
 
-_Any and every app IS-A state machine. With Dart async code it is hard to have a predictable and testable state machine encompassing a big app, like a tax filling tool. We usually deal with state transitions complexity by isolating and chopping functionality to smallest possible pieces, ones that transit just a few bits of state. Then we do a patchwork of them to get at envisioned user experience._
+_Any and every app IS-A state machine. With Dart async code it is hard to have a predictable and testable state machine encompassing a big app like a tax filling tool. We usually deal with state transitions complexity by isolating and chopping functionality to smallest possible pieces, ones that transit just a few bits of state. Then we do a patchwork of them to get at envisioned user experience._
 
-_This approach usualy works. Until it wont anymore due to "impossible states" that start to show: usually at random, at some devices, for some users - as our app grew. Unit tests can't catch intertwined state transitions. Integration tests are asynchronous, so they shall, but all run on our machines. Proverbial "here it works". Then we bloat code with more monitors hoping to catch culprit in the wild. Nope. Surrounded by monitors heisenbug hides well..._
+_This approach usualy works. Until it wont anymore due to "impossible states" that start to show: usually at random, at some devices, for some users - as our app grew. Unit tests can't catch intertwined state transitions. Integration tests are asynchronous, so they shall, but all run on our machines giving proverbial "here it works" results. Then we bloat code with more monitors hoping to catch culprit in the wild. Nope. Surrounded by monitors heisenbug hides well..._
