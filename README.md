@@ -9,7 +9,7 @@ Because Toggler based state machine transitions are fully synchronous, these are
 
 Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (199 of 199 lines)`
+Test coverage: `100.0% (202 of 202 lines)`
 
 ## Why should I use this for app state managnment?
 
