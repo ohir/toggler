@@ -5,14 +5,23 @@ const bIndexMax = 31; // web
 /// mask to select all state bits
 const sMaskAll = 0xffffffff; // web
 /// true in dart2js compilations, false on native
-const kWeb = true;
+const kIsWeb = true;
 
 // Error: The integer literal can't be represented exactly in JavaScript.
-// const internal = kWeb ? shortmask : longmask; // does not work
+// const internal = kIsWeb ? shortmask : longmask; // does not work
 /// internal thing, must be public as Dart tools lack capabilty to do a real
 /// conditional compilation.  See https://github.com/dart-lang/sdk/issues/33249
 /// ```
-/// const mTogglerPlatformMask = 0x7fffffffffff01ff; // 63bit native
-/// const mTogglerPlatformMask = 0x000fffffffff01ff; // 52bit js
+/// // 63 bit, native
+/// const bIndexMax            = 62;
+/// const kIsWeb               = false;
+/// const sMaskAll             = 0x7fffffffffffffff;
+/// const sTogglerPlatformMask = 0x7fffffffffff01ff;
+///
+/// // js compat, 52/32 bit
+/// const bIndexMax            = 31;
+/// const kIsWeb               = true;
+/// const sMaskAll             = 0x00000000ffffffff;
+/// const sTogglerPlatformMask = 0x000fffffffff01ff;
 /// ```
-const mTogglerPlatformMask = 0x000fffffffff01ff; // 52bit js
+const sTogglerPlatformMask = 0x000fffffffff01ff; // 52bit js

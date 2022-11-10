@@ -44,7 +44,7 @@ const _ferr = 1 << 13; //
 /// on-hold flag : hh bit 14
 const _fheld = 1 << 14; //
 /// clear all flags
-const _fZero = mTogglerPlatformMask; //
+const _fZero = sTogglerPlatformMask; //
 
 /// Toggler class keeps state changes register of up to 63 (32 for web) boolean
 /// values (items) that can be manipulated one by one or in concert.
