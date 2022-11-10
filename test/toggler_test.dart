@@ -509,7 +509,9 @@ void main() {
       int bkval = 0;
       bool cf(Toggler oS, TransientState nS) {
         bk();
-        oS.copyStateTo(cpy);
+        // oS.copyStateBitsTo(cpy);
+        cpy.bits = oS.bits;
+        cpy.ds = oS.ds;
         bkval = nS.signals;
         return true;
       }
@@ -526,7 +528,8 @@ void main() {
       Toggler cpy = Toggler();
       int bkval = 0;
       bool cf(Toggler oS, TransientState nS) {
-        oS.copyStateTo(cpy);
+        cpy.bits = oS.bits;
+        cpy.ds = oS.ds;
         expect(flags.bits, equals(0));
         expect(oS.bits, equals(0));
         bk(); // 32
