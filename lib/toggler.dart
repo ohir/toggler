@@ -23,7 +23,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (200 of 200 lines)
+/// Test coverage: **100.0%** (197 of 197 lines)
 library toggler;
 
 // this woodoo is insane
@@ -44,7 +44,7 @@ const _ferr = 1 << 13; //
 /// on-hold flag : hh bit 14
 const _fheld = 1 << 14; //
 /// clear all flags
-const _fZero = mTogglerPlatformMask; //
+const _fZero = sTogglerPlatformMask; //
 
 /// Toggler class keeps state changes register of up to 63 (32 for web) boolean
 /// values (items) that can be manipulated one by one or in concert.
@@ -78,8 +78,8 @@ class Toggler {
   int rg;
 
   /// recently changed bits mask. 1s marks changed state bit at respective
-  /// positions.  It represents _outgoing signals_ about recent changes done.
-  /// _Never copied nor cloned_.
+  /// positions.  It represents most recent _outgoing signals_ about changes.
+  /// _Never copied_.
   ///
   /// Getters [changed] and [changedAt] are more convenient to use than direct
   /// read of `chb`.
@@ -94,24 +94,24 @@ class Toggler {
   /// state management architecture used.
   int hh;
 
-  /// handler `void after(TransientState fixState, Toggler current)`
+  /// handler `void after(Toggler commitedState)`
   /// is called after state change has been _commited_. If not null, it is
   /// expected to deal also with after-change notifications. Especially ones
   /// that do not fit in the uniform `notifier` shape (eg. some _Model_ value
-  /// can be fed to some _Stream_). If `after` is present it is also expected to
-  /// pass current _chb_ to the _notifier_, in the very last line:
-  /// `current.notifier?.pump(current.chb);`
+  /// can be fed to some _Stream_).  Then it should pass _commitedState.chb_ to the
+  /// _notifier_, in the very last line:
+  /// `commitedState.notifier?.pump(commitedState.chb);`
   TogglerAfterChange? after;
 
   /// handles outgoing notifications with some concrete implementation of a
-  /// ToggledNotifier class. If given, it will be _pumped_ with _chb_ after any
-  /// change if _fix_ will return _true_, and if _fix_ did not marked new state
-  /// as _done_.
+  /// [ToggledNotifier] class. If given, it will be _pumped_ with _chb_ after
+  /// any change if _fix_ will return _true_, and if _fix_ did not marked
+  /// other intent with a `newState.skipAfterAndNotify()` call.
   ///
   /// If both _notifier_ object and [after] handler are given, _notifier_ is
   /// **not** run automatically: if needed, you should _pump_ it from within
   /// your [after] handler yourself. Ie. your last line of [after] handler
-  /// should say `current.notifier!.pump(current.chb);`
+  /// should say `commitedState.notifier?.pump(commitedState.chb);`
   ToggledNotifier? notifier;
 
   /// handler `bool fix(Toggler liveState, TransientState newState)`
@@ -119,31 +119,33 @@ class Toggler {
   /// condition is met, or testing and/or manipulating outer state of some
   /// _Model_ a [Toggler] instance reflects.
   ///
-  /// _Fix_ fires either on a direct change request (eg. set1, clear, toggle),
+  /// _Fix_ fires either on a direct change request (eg. set1, disable, toggle),
   /// or on a _signal_ called by a reflected entity.
   ///
-  /// Arguments:
   /// - `liveState` is a reference to _this_ toggler. It can be read, it may not
   /// be manipulated.
-  /// - `newState` is a Toggler with added _signals_ api, that allow to extend
-  /// state settling over more than one Toggler (or _Model_). NewState object
-  /// will have its `.bits` and `.ds` updated with incoming _direct_ change,
-  /// if `fix` runs due to some set. Or _newState_ will have non-zero `signals`
-  /// property, if `fix` runs dua to a signal.  See also [TransientState] docs.
-  /// If `fix` calls some _outer_ code that in turn sets or signals something back,
-  /// these _outer_ changes will be seen on a _newState_ immediately, for `fix`
-  /// to inspect, register, or revert.
+  /// - `newState` is a [TransientState] object, ie. a [Toggler] subclass that
+  /// adds a _signals_ api. _NewState_ have its `.bits` and `.ds` copied from
+  /// _live_ then updated with incoming _direct_ change, if `fix` runs due to
+  /// some bit being set or cleared. Or it will have non-zero `signals`, if
+  /// `fix` runs due to a _signal_.  (TL;DR: `if (newState.signals != 0)` then
+  /// `fix` fired on signal, otherwise on a bit setter).
   ///
-  /// Any operations `fix` does on its `newState` argument and external operations
-  /// that were reflected in the _newState_ will be seen as a next _live state_
-  /// after `fix` returns _true_, ie. "commits" a new state.  On a _false_
-  /// return changes will be abandoned. Note that _changes to the register_, not
-  /// changes made to the reflected values, the less to the _outer_ state).
+  /// On the `fix` run  `newState` will register effects of this `fix` handler
+  /// making changes. Either direct from _newState_''s setters, or applying
+  /// changes to _Model_ internal values that _set_ or [toggle] register bits as
+  /// a signal, or changes to external entities that may [signal] back.
+  /// (This mechanics provides running `fix` with a feedback about changes it
+  /// initiated without risking accidental recurrent loop).
   ///
-  /// - On a _state commit_ signals that came are merged with _newState_ register
-  /// changes and both make to the _live state_ `chb` "changed bits" register, also
-  /// called an "out signal".  Unless supressed or cleared using
-  /// [TransientState] methods.  The `chb` finally may make to the [notifier].
+  /// When `fix` is done, signals that came during a fix round are automatically
+  /// revealed on the _live state_ `chb` - unless a particular signal is
+  /// supressed or all `signals` are zeroed using [TransientState] methods.
+  ///
+  /// Any changes made to the _newState_ will become a new _live state_ upon
+  /// `fix` true return, aka _commit_.  On _false_ return changes to this
+  /// **register** (and to the register only) are abandoned. Except for _done_
+  /// and _error_ flags, that get cleared always.
   ///
   /// In simpler Apps `fix` state handler is the only place where business-logic
   /// is implemented and where Model state transitions occur.
@@ -151,8 +153,8 @@ class Toggler {
   /// - If `fix` is null _signals_ are ignored, then any and every and each
   /// _direct change_ from a setter is commited immediately.
   /// - during the `fix` run registries as read from the _outside_ the `fix`
-  /// handler are still in the stable ("fixed") state.  Any changes from the
-  /// _outside_ can be seen only _inside_ the `fix`.
+  /// handler are still in the stable ("fixed") state.  Any changes coming from
+  /// the _outside_ can be seen only _inside_ the `fix`.
   TogglerStateFixer? fix;
 
   /// Toggler registers are public for easy tests and custom serialization.
@@ -183,8 +185,8 @@ class Toggler {
   bool get _live => fix != null || notifier != null || after != null;
 
   /// _done_ flag can be set on a _live_ Toggler by an outer code. 'Done' always
-  /// is cleared automatically on a state change, but is seen on the _liveState_
-  /// by a `fix` handler.
+  /// is cleared automatically on a state change, but can be tested on the
+  /// _liveState_ of a `fix` handler.
   bool get done => hh & _fdone != 0;
   set done(bool e) => e ? hh |= _fdone : hh &= ~_fdone;
 
@@ -202,6 +204,7 @@ class Toggler {
   /// In _release_ code it is prudent to check error sparsely, eg. on leaving
   /// a route (if error happened it means your tests are broken: cause in debug
   /// builds an assertion should threw right after setting the _error_ flag.
+  /// As other flags this also is cleared on a _state commit_ after the `fix`.
   bool get error => hh & _ferr != 0;
   set error(bool e) => e ? hh |= _ferr : hh &= ~_ferr;
 
@@ -251,14 +254,6 @@ class Toggler {
   @pragma('vm:prefer-inline')
   @pragma('dart2js:tryInline')
   bool changedAt(int at) => chb & (1 << _v(at)) != 0;
-
-  /// copy `bits` and `ds` to the `other` Toggler
-  @pragma('vm:prefer-inline')
-  @pragma('dart2js:tryInline')
-  copyStateTo(Toggler other) {
-    other.bits = bits;
-    other.ds = ds;
-  }
 
   /// _true_ if state of `this` and `other` differs. Optionally just at positions
   /// provided with _mask_ (1), or within a given _first..last__ indice
@@ -605,31 +600,14 @@ class Toggler {
   }
 } // class Toggler
 
-/// Volatile object passed to `fix` and `after` handlers.
+/// [TransientState] instance is passed to the `fix` handler as a `newState`
+/// argument.
 ///
-/// At the `fix` beginning it exposes snapshot of the _live state_ `bits` and `ds`,
-/// along with _signals_ that may have fired the state transition.  On the `fix`
-/// run this object will register effects of this `fix` handler making changes
-/// (eg. _Model_ internals that usually _set_ or _clear_ bits, or externals
-/// entities that usually _signals_ back).  This mechanics provides running
-/// `fix` with a feedback about changes it initiated without risking accidental
-/// recurrent loops.
+/// [TransientState] subclass adds to Toggler a _signal_ manipulation api,
+/// allowing `fix` handler to inspect signals that fired it or may come during a
+/// state fixing round.
 ///
-/// Signals that came during a fix round are automatically passed on to the _live
-/// state_ `chb` (unless supressed or `signals` zeroed). State (`bits`, `ds`)
-/// changes can be applied to the `newState` argument of `fix` using
-/// [copyStateTo] method.
-///
-/// It can be read like its ancestor Toggler.
-/// , but its state may not be modified
-/// internally (from `fix`). It **will** be modified externally, if your `fix`
-/// called something
-/// [TransientState] adds to Toggler a _signal_
-/// manipulation api, allowing to inspect signals that may come during a `fix`
-/// round and modify or supress "out" signals that will be passed to `after`
-/// then to `notifier` once `fix` ends.
-///
-/// _Beware! a bloat of foolproofing checks was removed, so you certainly now MAY
+/// _Beware! a bloat of foolproofing checks was removed, so you certainly now may
 /// make troubles for yourself eg. by assigning TransientState object a `fix` or
 /// `notifier`, or side-modifying state through a reference.  Do not do that!_.
 class TransientState extends Toggler {
@@ -639,8 +617,8 @@ class TransientState extends Toggler {
   /// run. Has 1 at signalled bIndex position(s).
   ///
   /// May change during the `fix` run, if `fix` modifies something external that
-  /// in turn signals back.  Registers first and then any number of signals coming
-  /// to the same index.
+  /// in turn signals back.  Registers the first and then any number of signals
+  /// coming to the same index.
   int signals = 0;
 
   /// outgoing singnals mask (1 masked, ie. signal will be cancelled).
@@ -648,7 +626,7 @@ class TransientState extends Toggler {
 
   /// A tag that was passed with a firing signal.
   ///
-  /// Subsequent signals may not register their tags directly. If needed such
+  /// Subsequent signals may not register their tags directly. If needed, such
   /// feature can be added to a _Model_ with a few lines wrapper and a List.
   /// _Read also [signal] docs_.
   ///
@@ -660,18 +638,18 @@ class TransientState extends Toggler {
   int get signalTag => hh >> 16;
 
   /// [TransientState] serial is always 0. The _live state_ [serial] is always
-  /// one less than serial of the `newState` argument.
+  /// one less than serial of the commited next state.
   @override
   int get serial => 0;
 
-  /// supress outgoing signal (ones of _live state_ chb) by index.  All can be
+  /// supress outgoing signal (ones of _live state_ chb) at bIndex.  All can be
   /// supressed by `supress = sMaskAll;`
   void supressOutAt(int bIndex) => supress |= 1 << _v(bIndex);
 
-  /// clear incoming signals by index. All can be cancelled by `signals = 0;`.
+  /// clear incoming signals by index. All can be cleared by `signals = 0;`.
   void clearComingAt(int bIndex) => signals &= ~(1 << _v(bIndex));
 
-  /// commit but do not inform the _outer world_ (eg. if all changes are internal)
+  /// commit but do not inform the _outer world_ (eg. if all changes are internal only)
   void skipAfterAndNotify() => hh |= _finish;
 
   /// forcefully fixes _bIndex_ "changed" signal, regardless of its
@@ -701,33 +679,23 @@ typedef TogglerAfterChange = void Function(Toggler commitedState);
 
 // coverage:ignore-start
 /// Convenience superclass for _Models_ having Toggler as an msr.
-/// Not a mixin.
 abstract class ModelStateRegister {
   final Toggler msr = Toggler();
-  ModelStateRegister({
-    TogglerStateFixer? fix,
-    TogglerAfterChange? after,
-    ToggledNotifier? notifier,
-  }) {
-    msr.fix = fix;
-    msr.after = after;
-    msr.notifier = notifier;
-  }
 }
 
 /// Toggler's change notification dispatcher, an abstract interface.
-/// Concrete implementation can be found eg. in `package:uimodel/uimodel.dart`
 abstract class ToggledNotifier {
   /// the _chb_ recent changes bitmask is to be pumped here.
   /// Automatically, if an implementation is provided to Toggler _notifier_.
   void pump(int chb);
 
-  /// implementations may inform about how many points observe
+  /// implementations may inform about how many points observe this notifier
   int get observers => -1;
 
-  /// deregistering and cleanup code should go to `detachSelf`
+  /// deregister and cleanup
+  ///
   /// It is expected that it is the Notifier having the most knowledge who
-  /// is listening.
+  /// is listening/observing it. It should take care of detaching itself.
   void detachSelf() {}
 }
 
@@ -736,6 +704,7 @@ abstract class ToggledNotifier {
 String _ph(int n, [int len = 8]) => _pd(n, len, 16);
 
 /// positive integer to decimal string with leading zeros, fixed width 'len'
+/// Len up to 32 positions is supported.
 String _pd(int n, [int len = 2, int radix = 10]) {
   const zc = '00000000000000000000000000000000';
   final zs = (len < zc.length) ? zc.substring(0, len) : zc;
