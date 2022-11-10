@@ -13,6 +13,6 @@ const kWeb = true;
 /// conditional compilation.  See https://github.com/dart-lang/sdk/issues/33249
 /// ```
 /// const mTogglerPlatformMask = 0x7fffffffffff01ff; // 63bit native
-/// const mTogglerPlatformMask =   0x1fffffffff01ff; // 52bit js
+/// const mTogglerPlatformMask = 0x000fffffffff01ff; // 52bit js
 /// ```
-const mTogglerPlatformMask = 0x1fffffffff01ff; // web
+const mTogglerPlatformMask = 0x000fffffffff01ff; // 52bit js
