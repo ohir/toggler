@@ -67,6 +67,7 @@ void main() {
       flags.set1(12);
       expect(flags.anyOfSet(rangeFirst: 8, rangeLast: 11), isFalse);
     });
+    /* fix methods are removed, too brittle for models
     test('fixDs fixBits may not register change', () {
       flags.fixDS(1, true);
       expect(flags.active(1), isFalse);
@@ -74,7 +75,7 @@ void main() {
       flags.fixBits(1, true);
       expect(flags[1], isTrue);
       expect(flags.chb, equals(0));
-    });
+    });*/
     test('DisableEnable', () {
       flags.disable(0);
       expect(flags.active(0), isFalse);
