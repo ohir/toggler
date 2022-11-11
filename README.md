@@ -10,7 +10,7 @@ For direct use in ViewModels of _Flutter_ UI **Toggler** provides an independent
 
 Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (197 of 197 lines)`
+Test coverage: `100.0% (193 of 193 lines)`
 
 ## Why should I use this for app state managnment?
 
@@ -203,7 +203,7 @@ _Follow the convention. Then if not you visually at writing, your linter later m
 
 - This library is synchronous so your handler methods should complete fast enough. Any interface with async code should be done via a proper state cycle (eg. in a separate Isolate). Ie. while your async code may easily register in Toggler, you should pass any changes back only using a `notifier`.
 
-- While `fix` runs the live Toggler state is on hold. External changes and signals are coming directly to the `newState` that is not externally observable until commited. Others, including other's `fix` handlers know only about stable state. Noenetheless that all changes made and signals that came on the run will be reflected at the _changed bits_ outgoing signal. (Unless user intentinally supress them from within the `fix`).
+- While `fix` runs the live Toggler state is on hold. External changes and signals are coming directly to the `newState` that is not externally observable until commited. Others, including other's `fix` handlers know only about stable state. Nonetheless, all changes made and signals that came on the run will be reflected at the _changed bits_ outgoing signal. (Unless user intentinally supress them from within the `fix`).
 
 <!--
 #### promised longer intro

@@ -23,7 +23,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (197 of 197 lines)
+/// Test coverage: **100.0%** (193 of 193 lines)
 library toggler;
 
 // this woodoo is insane
@@ -512,21 +512,6 @@ class Toggler {
     hh &= ~_fheld; // XXX darts ~ makes negative
     assert(hh >= 0, "George Boole's poltergeist is kicking our highest bit");
   }
-
-  /// not registering setter for disable bits, for use from user `fix` code
-  @pragma('vm:prefer-inline')
-  @pragma('dart2js:tryInline')
-  void fixDS(int bIndex, bool to) =>
-      to ? ds |= (1 << _v(bIndex)) : ds &= ~(1 << _v(bIndex));
-
-  /// not registering setter for state bits, for use from user `fix` code
-  ///
-  /// Note that non registering setter is not radio-group aware. Ie. calling
-  /// this may set more than one bit on a radio-group.
-  @pragma('vm:prefer-inline')
-  @pragma('dart2js:tryInline')
-  void fixBits(int bIndex, bool to) =>
-      to ? bits |= (1 << _v(bIndex)) : bits &= ~(1 << _v(bIndex));
 
   /// _true_ if Toggler item at _index_ is set (`tg` item bit is 1).
   @pragma('vm:prefer-inline')
