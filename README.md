@@ -10,7 +10,7 @@ For direct use in ViewModels of _Flutter_ UI **Toggler** provides an independent
 
 Toggler is a single concrete class library with no dependencies.
 
-Test coverage: `100.0% (193 of 193 lines)`
+Test coverage: `100.0% (194 of 194 lines)`
 
 ## Why should I use this for app state managnment?
 
