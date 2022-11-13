@@ -621,8 +621,6 @@ class TransientState extends Toggler {
   /// Subsequent signals may not register their tags directly. If needed, such
   /// feature can be added to a _Model_ with a few lines wrapper and a sigList.
   /// _Read also [signal] docs_.
-  ///
-  /// - _To be used only on an _fixState_ argument within a `fix` handler_
   int signalTag = 0;
 
   /// _true_ if signal came with error flag true
@@ -637,11 +635,6 @@ class TransientState extends Toggler {
   /// reciprocally change us.  May happen by accident after eg. a refactoring.
   /// Use TogglerDiags extension to read bitfields.
   List<int>? sigList;
-
-  /// [TransientState] serial is always 0. The _live state_ [serial] is always
-  /// one less than serial of the commited next state.
-  // @override
-  //int get serial => 0;
 
   /// supress outgoing signal (ones of _live state_ chb) at bIndex.  All can be
   /// supressed by `supress = sMaskAll;`
