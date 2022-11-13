@@ -23,7 +23,7 @@
 ///
 /// Toggler is small, fast, and it has no dependecies.
 ///
-/// Test coverage: **100.0%** (193 of 193 lines)
+/// Test coverage: **100.0%** (194 of 194 lines)
 library toggler;
 
 // this woodoo is insane
@@ -33,8 +33,10 @@ export 'src/const.dart' if (dart.library.io) 'src/const64.dart';
 /// (63|33) highest bit index
 const _hbi = bIndexMax + 1; // native ? 63 : 33;
 
-/// (62|32) item max index bit
-// const _imax = bIndexMax; //
+// signal next flag :  hh/ca9 bit 6
+// const _fsignxt = 1 << 6; //
+// signal error flag :  hh/ca9 bit 7
+const _fsigerr = 1 << 7; //
 /// finished, commit but do not call after/notifier  flag : hh bit 11
 const _finish = 1 << 11; //
 /// do revert flag : hh bit 11
@@ -463,31 +465,6 @@ class Toggler {
   TransientState? _trs; // instance
   TransientState? _tranS; // in use
 
-  /// signal some change at `bIndex`. A noop if there is no `fix` handler attached.
-  /// Except for first (aka firing) signal, any number of others coming at the
-  /// same _bIndex_ will register only once.
-  ///
-  /// - `tag` number can be read from _tranState.signalTag_. It must fit in 32b uint.
-  /// Only _firing_ signal tag is preserved.
-  void signal(int bIndex, {int tag = 0}) {
-    // xTODO signal
-    assert(_tranS == null || !_tranS!.held, '''
-  Synchronous set or signal came from a distant place on "after" or "notifier" run.
-
-  Usually it means that an other fixer changes or signalls us back while acting
-  on notify it got from us.  Such behavior might make for an endless loop so we
-  break early.
-
-  In release build such set or signal will be silently ignored.
-
-  ''');
-    assert(tag < 1 << 32, 'Signal tag must fit into 32 bits number');
-    if (fix == null) return;
-    _tranS != null
-        ? _tranS!.signals |= 1 << _v(bIndex)
-        : _verto(_v(bIndex), tag, false, true, true);
-  }
-
   /// set semaphore forebading any changes to the live state.
   /// Not to be called in `fix` or `after`;
   @pragma('vm:prefer-inline')
@@ -523,8 +500,37 @@ class Toggler {
   @pragma('dart2js:tryInline')
   void operator []=(int bIndex, bool v) => _set(bIndex, false, v);
 
+  /// signal some change at `bIndex`. A noop if there is no `fix` handler attached.
+  /// Except for first (aka firing) signal, any number of others coming at the
+  /// same _bIndex_ will register only once.
+  ///
+  /// - `tag` number can be read from _tranState.signalTag_. It must fit in 32b uint.
+  /// Only _firing_ signal tag is preserved.
+  void signal(int bIndex, {int tag = 0, bool err = false}) {
+    // xTODO signal
+    assert(_tranS == null || !_tranS!.held, '''
+  Synchronous set or signal came from a distant place on "after" or "notifier" run.
+
+  Usually it means that an other fixer changes or signalls us back while acting
+  on notify it got from us.  Such behavior might make for an endless loop so we
+  break early.
+
+  In release build such set or signal will be silently ignored.
+
+  ''');
+    assert(tag < 1 << 32, 'Signal tag must fit into 32 bits number');
+    if (fix == null) return;
+    if (_tranS != null) {
+      _tranS!.signals |= 1 << _v(bIndex);
+      _tranS!.sigList?.add((tag * 256) + (err ? _fsigerr : 0) + bIndex);
+    } else {
+      _verto(_v(bIndex), tag, err, false, true);
+    }
+  }
+
   /// Toggler state transition engine.
   ///
+  /// - signal: _verto(signal bIndex, Tag, flagError, flagNext, true)
   /// - nEW has new value for `bits` or `ds`; or signal's Tag,
   /// - isDs tells that _ds_ has changed; otherwise _bits_;
   /// - to1 tells change direction;
@@ -534,22 +540,23 @@ class Toggler {
     if (_tranS != null || hh & _fheld != 0) return; // live but on hold
     final nhh = (((hh >> 16) + 1) << 16) | // serial++, flags b15..b9
         ((isSig ? (1 << 8) : 0) | //   b8: by a signal,   ca9  b8..b0
-            (isDs ? (1 << 7) : 0) | // b7: tg/ds
-            (to1 ? (1 << 6) : 0) | //  b6: to0/to1
+            (isDs ? (1 << 7) : 0) | // b7: tg/ds,        sigErrorFlag
+            (to1 ? (1 << 6) : 0) | //  b6: to0/to1       sigNextFlag
             bIndex); //            b5..b0: item index
     // singleton transient state
     _trs ??= TransientState();
     if (isSig) {
+      _trs!.signalTag = nEW;
       _trs!.bits = bits;
       _trs!.ds = ds;
-      _trs!.hh = (nEW << 16 | (nhh & 0x1ff)); // tag
       _trs!.chb = 0;
     } else {
+      _trs!.signalTag = 0;
       _trs!.bits = isDs ? bits : nEW;
       _trs!.ds = isDs ? nEW : ds;
-      _trs!.hh = nhh & 0x1ff; // tag zero
       _trs!.chb = isDs ? ds ^ nEW : bits ^ nEW;
     }
+    _trs!.hh = nhh & _fZero; // zero serial, pass ca9
     _trs!.signals = 0;
     _trs!.supress = 0;
     _trs!.rg = rg;
@@ -606,26 +613,35 @@ class TransientState extends Toggler {
   /// coming to the same index.
   int signals = 0;
 
-  /// outgoing singnals mask (1 masked, ie. signal will be cancelled).
+  /// outgoing signals mask (1 masked, ie. signal will be cancelled).
   int supress = 0;
 
   /// A tag that was passed with a firing signal.
   ///
   /// Subsequent signals may not register their tags directly. If needed, such
-  /// feature can be added to a _Model_ with a few lines wrapper and a List.
+  /// feature can be added to a _Model_ with a few lines wrapper and a sigList.
   /// _Read also [signal] docs_.
   ///
-  /// As any other signal-related data this can be read (can be non-zero) only
-  /// in the body of the `fix` handler on its _fixState_ parameter.
-  /// Otherwise always 0.  An assert is added to curb misuse early.
-  ///
   /// - _To be used only on an _fixState_ argument within a `fix` handler_
-  int get signalTag => hh >> 16;
+  int signalTag = 0;
+
+  /// _true_ if signal came with error flag true
+  bool get signalError => hh & _fsigerr != 0;
+
+  /// Debug/diagnostics field.
+  ///
+  /// If not null, each subsequent signal coming will
+  /// add a moniker of `tag<<8 | sigerr (b7) | bIndex(b5..b0)` so we may hunt
+  /// for a lost signal.  Lost signal may happen if on the `fix` run from
+  /// A to B, then B to C, both B and C fixers happen to signal back or
+  /// reciprocally change us.  May happen by accident after eg. a refactoring.
+  /// Use TogglerDiags extension to read bitfields.
+  List<int>? sigList;
 
   /// [TransientState] serial is always 0. The _live state_ [serial] is always
   /// one less than serial of the commited next state.
-  @override
-  int get serial => 0;
+  // @override
+  //int get serial => 0;
 
   /// supress outgoing signal (ones of _live state_ chb) at bIndex.  All can be
   /// supressed by `supress = sMaskAll;`

@@ -701,6 +701,14 @@ void main() {
     setUp(() {
       flags = Toggler();
     });
+    test('Signal err', () {
+      flags.fix = (Toggler oS, TransientState nS) {
+        expect(nS.signalTag, equals(33));
+        expect(nS.signalError, isTrue);
+        return true;
+      };
+      flags.signal(8, tag: 33, err: true);
+    });
     test('Serial, supress', () {
       flags.fix = (Toggler oS, TransientState nS) {
         nS.bits = 0x17f; // b8 ~b7 b6..b0
@@ -710,7 +718,7 @@ void main() {
         nS.clearComingAt(9); // !b9
         //                       255
         expect(nS.signalTag, equals(33)); // tag 33
-        expect(nS.serial, equals(0)); // but serial 0
+        expect(nS.serial, equals(oS.serial + 1)); //
         return true;
       };
       flags.signal(8, tag: 33);
